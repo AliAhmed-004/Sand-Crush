@@ -16,10 +16,13 @@ class SandGame extends FlameGame with TapCallbacks {
   late Offset gridOffset;
 
   /// Grid dimensions
-  final int cols = 140;
-  final int rows = 190;
+  final int cols = 40;
+  final int rows = 40;
 
   final Paint cellPaint = Paint()..color = Colors.orange;
+
+  double _accumulator = 0;
+  static const double _step = 1 / 30; // 30 sim steps per second
 
   @override
   Future<void> onLoad() async {
@@ -69,7 +72,12 @@ class SandGame extends FlameGame with TapCallbacks {
   @override
   void update(double dt) {
     super.update(dt);
-    sandWorld.update(dt);
+    _accumulator += dt;
+
+    while (_accumulator >= _step) {
+      sandWorld.update(_step);
+      _accumulator -= _step;
+    }
   }
 
   @override

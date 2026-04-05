@@ -9,6 +9,9 @@ class SandWorld {
   /// 2D grid storing whether a cell is filled
   late List<List<bool>> grid;
 
+  /// For optimization: track which cells are active (moving sand)
+  Set<Point<int>> activeCells = {};
+
   SandWorld({required this.cols, required this.rows}) {
     grid = List.generate(rows, (_) => List.generate(cols, (_) => false));
   }
@@ -18,6 +21,8 @@ class SandWorld {
     if (!isInside(x, y)) return;
 
     grid[y][x] = true;
+
+    _wake(activeCells, x, y);
   }
 
   /// Check bounds
@@ -32,38 +37,55 @@ class SandWorld {
 
   /// Apply gravity to all cells (placeholder)
   void applyGravity() {
-    // Use a 2-grid system
-    // One for current state, one for next state
     final nextGrid = List.generate(
       rows,
       (_) => List.generate(cols, (_) => false),
     );
 
-    // Process the current grid and fill the next grid
-    for (int y = rows - 1; y >= 0; y--) {
-      for (int x = 0; x < cols; x++) {
-        if (!grid[y][x]) continue; // Skip empty cells
+    final nextActive = <Point<int>>{};
+    final rand = Random();
 
-        // Randomly pick a direction (left or right)
-        // if true, try left first; if false, try right first
-        final dir = (Random().nextBool()) ? -1 : 1;
+    for (final p in activeCells) {
+      final x = p.x;
+      final y = p.y;
 
-        // Try to move down
-        if (isInside(x, y + 1) && !grid[y + 1][x]) {
-          nextGrid[y + 1][x] = true;
-        }
-        // If can't move down, try to move diagonally
-        else if (isInside(x + dir, y + 1) && !grid[y + 1][x + dir]) {
-          nextGrid[y + 1][x + dir] = true;
-        }
-        // Otherwise, stay in place
-        else {
-          nextGrid[y][x] = true;
-        }
+      if (!isInside(x, y)) continue;
+      if (!grid[y][x]) continue;
+
+      final dir = rand.nextBool() ? -1 : 1;
+
+      // try down
+      if (isInside(x, y + 1) && !grid[y + 1][x]) {
+        nextGrid[y + 1][x] = true;
+        _wake(nextActive, x, y + 1);
+      }
+      // try diagonal
+      else if (isInside(x + dir, y + 1) && !grid[y + 1][x + dir]) {
+        nextGrid[y + 1][x + dir] = true;
+        _wake(nextActive, x + dir, y + 1);
+      }
+      // stay
+      else {
+        nextGrid[y][x] = true;
+        _wake(nextActive, x, y);
       }
     }
 
-    // Update the grid to the next state
     grid = nextGrid;
+    activeCells = nextActive;
+  }
+
+  /// Mark a cell and its neighbors as active (for optimization)
+  void _wake(Set<Point<int>> set, int x, int y) {
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        final nx = x + dx;
+        final ny = y + dy;
+
+        if (isInside(nx, ny)) {
+          set.add(Point(nx, ny));
+        }
+      }
+    }
   }
 }
