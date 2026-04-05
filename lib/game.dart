@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
@@ -6,30 +8,25 @@ import 'package:sand_crush/world.dart';
 class SandGame extends FlameGame with TapCallbacks {
   late SandWorld sandWorld;
 
-  final double topUIRatio = 0.2; // 20% for HUD
-  final double bottomUIRatio = 0.2; // 20% for preview
+  final double topUIRatio = 0.2;
+  final double bottomUIRatio = 0.2;
 
-  /// Size of each grid cell in pixels
   double cellSize = 1;
-
-  /// Offset to center the grid on screen
   late Offset gridOffset;
 
-  /// Grid dimensions
   final int cols = 40;
   final int rows = 40;
 
   final Paint cellPaint = Paint()..color = Colors.orange;
 
   double _accumulator = 0;
-  static const double _step = 1 / 30; // 30 sim steps per second
+  static const double _step = 1 / 20;
 
   @override
   Future<void> onLoad() async {
     sandWorld = SandWorld(cols: cols, rows: rows);
   }
 
-  /// Called whenever screen size changes
   @override
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
@@ -40,38 +37,60 @@ class SandGame extends FlameGame with TapCallbacks {
     final playableHeight = size.y - topUIHeight - bottomUIHeight;
     final playableWidth = size.x;
 
-    // Now fit grid INSIDE this area
     final cellWidth = playableWidth / cols;
     final cellHeight = playableHeight / rows;
 
-    // Pick the smaller one to maintain square cells
     cellSize = cellWidth < cellHeight ? cellWidth : cellHeight;
 
     final gridWidth = cols * cellSize;
     final gridHeight = rows * cellSize;
 
-    // Center grid horizontally and vertically within playable area
     gridOffset = Offset(
       (size.x - gridWidth) / 2,
       topUIHeight + (playableHeight - gridHeight) / 2,
     );
   }
 
-  /// Handle tap input
+  // =========================================================
+  // INPUT (FIXED)
+  // =========================================================
+
   @override
   void onTapDown(TapDownEvent event) {
     final pos = event.localPosition;
 
-    // Convert screen → grid
     final gridX = ((pos.x - gridOffset.dx) / cellSize).floor();
     final gridY = ((pos.y - gridOffset.dy) / cellSize).floor();
 
-    sandWorld.placeCell(gridX, gridY);
+    if (!sandWorld.isInside(gridX, gridY)) return;
+
+    sandWorld.placeShape(_randomShape(), gridX, gridY);
   }
+
+  /// Generates a simple test shape (Tetris-like)
+  List<Point<int>> _randomShape() {
+    final shapes = [
+      // square
+      [Point(0, 0), Point(1, 0), Point(0, 1), Point(1, 1)],
+
+      // line
+      [Point(0, 0), Point(1, 0), Point(2, 0), Point(3, 0)],
+
+      // L shape
+      [Point(0, 0), Point(0, 1), Point(0, 2), Point(1, 2)],
+    ];
+
+    return shapes[DateTime.now().millisecond % shapes.length];
+  }
+
+  // =========================================================
+  // UPDATE LOOP
+  // =========================================================
 
   @override
   void update(double dt) {
     super.update(dt);
+
     _accumulator += dt;
 
     while (_accumulator >= _step) {
@@ -80,11 +99,14 @@ class SandGame extends FlameGame with TapCallbacks {
     }
   }
 
+  // =========================================================
+  // RENDERING (UNCHANGED - STILL VALID)
+  // =========================================================
+
   @override
   void render(Canvas canvas) {
     super.render(canvas);
 
-    // Draw grid cells
     for (int y = 0; y < rows; y++) {
       for (int x = 0; x < cols; x++) {
         if (!sandWorld.grid[y][x]) continue;
@@ -100,7 +122,6 @@ class SandGame extends FlameGame with TapCallbacks {
       }
     }
 
-    // Optional: draw grid lines (debug)
     _drawGridLines(canvas);
   }
 

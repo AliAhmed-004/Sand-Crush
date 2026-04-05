@@ -1,91 +1,203 @@
 import 'dart:math';
 
-/// This class contains the ACTUAL game state.
-/// It knows nothing about screen size, pixels, or UI.
+/// -----------------------------
+/// CELL MODEL
+/// -----------------------------
+class Cell {
+  int x;
+  int y;
+
+  Cell(this.x, this.y);
+}
+
+/// -----------------------------
+/// CLUSTER MODEL
+/// -----------------------------
+class Cluster {
+  final int id;
+  final List<Cell> cells;
+
+  Cluster({required this.id, required this.cells});
+}
+
+/// -----------------------------
+/// WORLD
+/// -----------------------------
 class SandWorld {
   final int cols;
   final int rows;
 
-  /// 2D grid storing whether a cell is filled
+  /// Grid is now ONLY for rendering lookup (not physics truth)
   late List<List<bool>> grid;
 
-  /// For optimization: track which cells are active (moving sand)
-  Set<Point<int>> activeCells = {};
+  /// Active clusters in the world
+  final Map<int, Cluster> clusters = {};
+
+  /// Fast lookup: (x,y) → clusterId
+  final Map<Point<int>, int> cellMap = {};
+
+  int _nextClusterId = 1;
 
   SandWorld({required this.cols, required this.rows}) {
     grid = List.generate(rows, (_) => List.generate(cols, (_) => false));
   }
 
-  /// Places a block at a grid position
+  // =========================================================
+  // PUBLIC API
+  // =========================================================
+
+  /// Spawn a single cell as its own cluster (old behavior compatibility)
   void placeCell(int x, int y) {
-    if (!isInside(x, y)) return;
-
-    grid[y][x] = true;
-
-    _wake(activeCells, x, y);
+    _createCluster([Cell(x, y)]);
   }
 
-  /// Check bounds
+  /// Spawn a Tetris-like shape
+  void placeShape(List<Point<int>> offsets, int originX, int originY) {
+    final cells = offsets.map((o) {
+      return Cell(originX + o.x, originY + o.y);
+    }).toList();
+
+    _createCluster(cells);
+  }
+
+  /// Update simulation
+  void update(double dt) {
+    _applyClusterPhysics();
+    _syncGridFromClusters();
+  }
+
+  /// Bounds check
   bool isInside(int x, int y) {
     return x >= 0 && x < cols && y >= 0 && y < rows;
   }
 
-  /// Update world (for future physics like gravity)
-  void update(double dt) {
-    applyGravity();
+  // =========================================================
+  // CLUSTER CREATION
+  // =========================================================
+
+  void _createCluster(List<Cell> cells) {
+    final id = _nextClusterId++;
+
+    final cluster = Cluster(id: id, cells: cells);
+
+    clusters[id] = cluster;
+
+    for (final c in cells) {
+      if (!isInside(c.x, c.y)) continue;
+
+      cellMap[Point(c.x, c.y)] = id;
+    }
   }
 
-  /// Apply gravity to all cells (placeholder)
-  void applyGravity() {
-    final nextGrid = List.generate(
-      rows,
-      (_) => List.generate(cols, (_) => false),
-    );
+  // =========================================================
+  // PHYSICS (CLUSTER-BASED GRAVITY)
+  // =========================================================
 
-    final nextActive = <Point<int>>{};
-    final rand = Random();
+  void _applyClusterPhysics() {
+    // Process clusters in order (could be optimized with topological sort later)
+    final clusterList = clusters.values.toList();
 
-    for (final p in activeCells) {
-      final x = p.x;
-      final y = p.y;
+    // Try to move each cluster down, down-left, or down-right
+    for (final cluster in clusterList) {
+      // Skip if cluster was already removed in this frame
+      if (!clusters.containsKey(cluster.id)) continue;
 
-      if (!isInside(x, y)) continue;
-      if (!grid[y][x]) continue;
+      // Try straight down first
+      bool moved = _tryMoveCluster(cluster, 0, 1);
 
-      final dir = rand.nextBool() ? -1 : 1;
-
-      // try down
-      if (isInside(x, y + 1) && !grid[y + 1][x]) {
-        nextGrid[y + 1][x] = true;
-        _wake(nextActive, x, y + 1);
+      // If can't move down, try down-left
+      if (!moved) {
+        moved = _tryMoveCluster(cluster, -1, 1);
       }
-      // try diagonal
-      else if (isInside(x + dir, y + 1) && !grid[y + 1][x + dir]) {
-        nextGrid[y + 1][x + dir] = true;
-        _wake(nextActive, x + dir, y + 1);
+
+      // If can't move down-left, try down-right
+      if (!moved) {
+        moved = _tryMoveCluster(cluster, 1, 1);
       }
-      // stay
-      else {
-        nextGrid[y][x] = true;
-        _wake(nextActive, x, y);
+
+      // If all movement failed → it breaks apart and settles as sand
+      if (!moved) {
+        _breakApartCluster(cluster);
+      }
+    }
+  }
+
+  void _breakApartCluster(Cluster cluster) {
+    // Remove the cluster from active simulation
+    clusters.remove(cluster.id);
+
+    // Create a single-cell cluster for each cell to settle independently
+    for (final cell in cluster.cells) {
+      if (!isInside(cell.x, cell.y)) continue;
+
+      // Create a new cluster with just this cell
+      _createCluster([Cell(cell.x, cell.y)]);
+    }
+  }
+
+  bool _tryMoveCluster(Cluster cluster, int dx, int dy) {
+    // 1. Check collision
+    for (final cell in cluster.cells) {
+      final nx = cell.x + dx;
+      final ny = cell.y + dy;
+
+      if (!isInside(nx, ny)) return false;
+
+      final existing = cellMap[Point(nx, ny)];
+
+      if (existing != null && existing != cluster.id) {
+        return false;
       }
     }
 
-    grid = nextGrid;
-    activeCells = nextActive;
+    // 2. Remove old positions
+    for (final cell in cluster.cells) {
+      cellMap.remove(Point(cell.x, cell.y));
+    }
+
+    // 3. Move cluster
+    for (final cell in cluster.cells) {
+      cell.x += dx;
+      cell.y += dy;
+    }
+
+    // 4. Re-register positions
+    for (final cell in cluster.cells) {
+      cellMap[Point(cell.x, cell.y)] = cluster.id;
+    }
+
+    return true;
   }
 
-  /// Mark a cell and its neighbors as active (for optimization)
-  void _wake(Set<Point<int>> set, int x, int y) {
-    for (int dy = -1; dy <= 1; dy++) {
-      for (int dx = -1; dx <= 1; dx++) {
-        final nx = x + dx;
-        final ny = y + dy;
+  // =========================================================
+  // GRID SYNC (FOR YOUR CURRENT RENDERER)
+  // =========================================================
 
-        if (isInside(nx, ny)) {
-          set.add(Point(nx, ny));
+  void _syncGridFromClusters() {
+    // reset grid
+    for (int y = 0; y < rows; y++) {
+      for (int x = 0; x < cols; x++) {
+        grid[y][x] = false;
+      }
+    }
+
+    // rebuild from clusters
+    for (final cluster in clusters.values) {
+      for (final cell in cluster.cells) {
+        if (isInside(cell.x, cell.y)) {
+          grid[cell.y][cell.x] = true;
         }
       }
     }
+  }
+
+  // =========================================================
+  // OPTIONAL: FUTURE SPLIT SUPPORT (SAFE PLACEHOLDER)
+  // =========================================================
+
+  /// Later upgrade: if clusters break apart, rebuild them here.
+  void rebuildClustersFromGrid() {
+    // intentionally left empty for now
+    // (this is where flood-fill clustering would go later)
   }
 }
