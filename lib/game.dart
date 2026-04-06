@@ -30,14 +30,30 @@ class SandGame extends FlameGame with TapCallbacks {
   // Pick a random color for the cell paint
   final Paint cellPaint = Paint()..color = colors.random();
 
+  // Fixed timestep accumulator
   double _accumulator = 0;
   static const double _step = 1 / 30;
 
+  // Track stability to trigger bridge checks only when the board transitions from unstable to stable
   bool _wasStableLastFrame = true;
+
+  // Next piece preview
+  late List<Point<int>> nextShape;
+  late Color nextColor;
+
+  // Preview UI settings
+  final double previewSize = 120.0; // size of the preview box in pixels
+  final int previewGridSize = 6; // small grid (e.g. 6x6) for preview
 
   @override
   Future<void> onLoad() async {
     sandWorld = SandWorld(cols: cols, rows: rows);
+    _generateNextPiece();
+  }
+
+  void _generateNextPiece() {
+    nextShape = _randomShape();
+    nextColor = colors[Random().nextInt(colors.length)];
   }
 
   @override
@@ -80,9 +96,10 @@ class SandGame extends FlameGame with TapCallbacks {
     // check if tap is within grid bounds
     if (!sandWorld.isInside(gridX, gridY)) return;
 
-    final randomColor = colors[Random().nextInt(colors.length)];
+    sandWorld.placeShape(nextShape, gridX, gridY, nextColor);
 
-    sandWorld.placeShape(_randomShape(), gridX, gridY, randomColor);
+    // Generate the next one immediately
+    _generateNextPiece();
   }
 
   /// Generates a scaled Tetris-like test shape that looks the same size
@@ -174,6 +191,7 @@ class SandGame extends FlameGame with TapCallbacks {
     }
 
     _drawGridLines(canvas);
+    _drawNextPiecePreview(canvas);
   }
 
   void _drawGridLines(Canvas canvas) {
@@ -197,6 +215,89 @@ class SandGame extends FlameGame with TapCallbacks {
         Offset(gridOffset.dx + cols * cellSize, dy),
         paint,
       );
+    }
+  }
+
+  void _drawNextPiecePreview(Canvas canvas) {
+    // Position: bottom center
+    final previewX = (size.x - previewSize) / 2;
+    final previewY = size.y - previewSize - 40;
+
+    // Background box
+    final bgRect = Rect.fromLTWH(previewX, previewY, previewSize, previewSize);
+    canvas.drawRect(
+      bgRect,
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.6)
+        ..style = PaintingStyle.fill,
+    );
+
+    // Border
+    canvas.drawRect(
+      bgRect,
+      Paint()
+        ..color = Colors.white24
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
+
+    // "NEXT" title
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: "NEXT",
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(previewX + (previewSize - textPainter.width) / 2, previewY - 28),
+    );
+
+    if (nextShape.isEmpty) return;
+
+    // === KEY CHANGE: Use the SAME cellSize as the main grid ===
+    final previewCellSize = cellSize; // ← This makes it match perfectly
+
+    // Find bounds of the shape
+    final minX = nextShape.map((p) => p.x).reduce((a, b) => a < b ? a : b);
+    final maxX = nextShape.map((p) => p.x).reduce((a, b) => a > b ? a : b);
+    final minY = nextShape.map((p) => p.y).reduce((a, b) => a < b ? a : b);
+    final maxY = nextShape.map((p) => p.y).reduce((a, b) => a > b ? a : b);
+
+    final shapeWidth = maxX - minX + 1;
+    final shapeHeight = maxY - minY + 1;
+
+    // Center the shape inside the preview box
+    final totalShapeWidth = shapeWidth * previewCellSize;
+    final totalShapeHeight = shapeHeight * previewCellSize;
+
+    final offsetX =
+        previewX + (previewSize - totalShapeWidth) / 2 - minX * previewCellSize;
+    final offsetY =
+        previewY +
+        (previewSize - totalShapeHeight) / 2 -
+        minY * previewCellSize;
+
+    // Draw the shape using the same cell size as the main grid
+    final paint = Paint()..color = nextColor;
+
+    for (final p in nextShape) {
+      final drawX = offsetX + p.x * previewCellSize;
+      final drawY = offsetY + p.y * previewCellSize;
+
+      final rect = Rect.fromLTWH(
+        drawX,
+        drawY,
+        previewCellSize,
+        previewCellSize,
+      );
+      canvas.drawRect(rect, paint);
     }
   }
 }
