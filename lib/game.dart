@@ -32,7 +32,7 @@ class SandGame extends FlameGame with TapCallbacks {
 
   // Fixed timestep accumulator
   double _accumulator = 0;
-  static const double _step = 1 / 30;
+  static const double _step = 1 / 60;
 
   // Track stability to trigger bridge checks only when the board transitions from unstable to stable
   bool _wasStableLastFrame = true;

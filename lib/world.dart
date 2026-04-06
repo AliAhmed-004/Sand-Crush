@@ -231,6 +231,8 @@ class SandWorld {
   /// Uses 4-way connectivity (up/down/left/right). Change the directions
   /// array to 8-way if you want diagonal connections to count as "touching".
   bool doesColorSpanLeftToRight(Color color) {
+    if (!_isStable) return false; // only check for bridges when stable
+
     // Fast early-out: does this color even exist on both walls?
     bool touchesLeft = false;
     bool touchesRight = false;
@@ -292,6 +294,9 @@ class SandWorld {
   /// from the left wall to the right wall.
   /// Returns `true` if a bridge was found and cleared.
   bool clearSpanningBridge(Color color) {
+    if (!doesColorSpanLeftToRight(color)) return false; // only clear if a bridge exists
+    if (!_isStable) return false; // only clear when stable to avoid weird edge cases
+
     // Fast early-out
     bool touchesLeft = false;
     bool touchesRight = false;
