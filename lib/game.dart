@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flame/events.dart';
+import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/world.dart';
@@ -17,7 +18,17 @@ class SandGame extends FlameGame with TapCallbacks {
   final int cols = 80;
   final int rows = 80;
 
-  final Paint cellPaint = Paint()..color = Colors.orange;
+  static final List<Color> colors = [
+    Colors.red,
+    Colors.orange,
+    Colors.yellow,
+    Colors.green,
+    Colors.blue,
+    Colors.purple,
+  ];
+
+  // Pick a random color for the cell paint
+  final Paint cellPaint = Paint()..color = colors.random();
 
   double _accumulator = 0;
   static const double _step = 1 / 30;
@@ -64,7 +75,10 @@ class SandGame extends FlameGame with TapCallbacks {
 
     if (!sandWorld.isInside(gridX, gridY)) return;
 
-    sandWorld.placeShape(_randomShape(), gridX, gridY);
+    final randomColor =
+        colors[Random().nextInt(colors.length)]; // ← safe & explicit
+
+    sandWorld.placeShape(_randomShape(), gridX, gridY, randomColor);
   }
 
   /// Generates a scaled Tetris-like test shape that looks the same size
@@ -132,7 +146,8 @@ class SandGame extends FlameGame with TapCallbacks {
 
     for (int y = 0; y < rows; y++) {
       for (int x = 0; x < cols; x++) {
-        if (!sandWorld.grid[y][x]) continue;
+        final cellColor = sandWorld.grid[y][x];
+        if (cellColor == null) continue;
 
         final rect = Rect.fromLTWH(
           gridOffset.dx + x * cellSize,
@@ -141,7 +156,8 @@ class SandGame extends FlameGame with TapCallbacks {
           cellSize,
         );
 
-        canvas.drawRect(rect, cellPaint);
+        final paint = Paint()..color = cellColor; // ← per-cell color
+        canvas.drawRect(rect, paint);
       }
     }
 

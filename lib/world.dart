@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui';
 
 /// -----------------------------
 /// CELL MODEL
@@ -6,8 +7,9 @@ import 'dart:math';
 class Cell {
   int x;
   int y;
+  final Color color; // ← NEW: every grain remembers its color
 
-  Cell(this.x, this.y);
+  Cell(this.x, this.y, this.color);
 }
 
 /// -----------------------------
@@ -28,7 +30,7 @@ class SandWorld {
   final int rows;
 
   /// Grid is now ONLY for rendering lookup (not physics truth)
-  late List<List<bool>> grid;
+  late List<List<Color?>> grid;
 
   /// Active clusters in the world
   final Map<int, Cluster> clusters = {};
@@ -39,7 +41,7 @@ class SandWorld {
   int _nextClusterId = 1;
 
   SandWorld({required this.cols, required this.rows}) {
-    grid = List.generate(rows, (_) => List.generate(cols, (_) => false));
+    grid = List.generate(rows, (_) => List.generate(cols, (_) => null));
   }
 
   // =========================================================
@@ -47,14 +49,19 @@ class SandWorld {
   // =========================================================
 
   /// Spawn a single cell as its own cluster (old behavior compatibility)
-  void placeCell(int x, int y) {
-    _createCluster([Cell(x, y)]);
+  void placeCell(int x, int y, Color color) {
+    _createCluster([Cell(x, y, color)]);
   }
 
   /// Spawn a Tetris-like shape
-  void placeShape(List<Point<int>> offsets, int originX, int originY) {
+  void placeShape(
+    List<Point<int>> offsets,
+    int originX,
+    int originY,
+    Color color,
+  ) {
     final cells = offsets.map((o) {
-      return Cell(originX + o.x, originY + o.y);
+      return Cell(originX + o.x, originY + o.y, color);
     }).toList();
 
     _createCluster(cells);
@@ -131,7 +138,7 @@ class SandWorld {
       if (!isInside(cell.x, cell.y)) continue;
 
       // Create a new cluster with just this cell
-      _createCluster([Cell(cell.x, cell.y)]);
+      _createCluster([Cell(cell.x, cell.y, cell.color)]);
     }
   }
 
@@ -177,7 +184,7 @@ class SandWorld {
     // reset grid
     for (int y = 0; y < rows; y++) {
       for (int x = 0; x < cols; x++) {
-        grid[y][x] = false;
+        grid[y][x] = null;
       }
     }
 
@@ -185,7 +192,7 @@ class SandWorld {
     for (final cluster in clusters.values) {
       for (final cell in cluster.cells) {
         if (isInside(cell.x, cell.y)) {
-          grid[cell.y][cell.x] = true;
+          grid[cell.y][cell.x] = cell.color;
         }
       }
     }
