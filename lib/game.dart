@@ -31,7 +31,7 @@ class SandGame extends FlameGame with TapCallbacks {
   final Paint cellPaint = Paint()..color = colors.random();
 
   double _accumulator = 0;
-  static const double _step = 1 / 30;
+  static const double _step = 1 / 60;
 
   bool _wasStableLastFrame = true;
 
@@ -70,15 +70,17 @@ class SandGame extends FlameGame with TapCallbacks {
 
   @override
   void onTapDown(TapDownEvent event) {
-    final pos = event.localPosition;
+    if (!sandWorld.isStable) return; // prevent new shapes while unstable
 
+    // Convert tap position to grid coordinates
+    final pos = event.localPosition;
     final gridX = ((pos.x - gridOffset.dx) / cellSize).floor();
     final gridY = ((pos.y - gridOffset.dy) / cellSize).floor();
 
+    // check if tap is within grid bounds
     if (!sandWorld.isInside(gridX, gridY)) return;
 
-    final randomColor =
-        colors[Random().nextInt(colors.length)]; // ← safe & explicit
+    final randomColor = colors[Random().nextInt(colors.length)];
 
     sandWorld.placeShape(_randomShape(), gridX, gridY, randomColor);
   }

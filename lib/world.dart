@@ -57,15 +57,29 @@ class SandWorld {
     _createCluster([Cell(x, y, color)]);
   }
 
-  /// Spawn a Tetris-like shape
+  /// Spawn a Tetris-like shape, automatically adjusted to fit entirely inside the grid.
   void placeShape(
     List<Point<int>> offsets,
     int originX,
     int originY,
     Color color,
   ) {
+    if (offsets.isEmpty) return;
+
+    // 1. Compute the shape's bounding box relative to its own origin
+    final minX = offsets.map((o) => o.x).reduce((a, b) => a < b ? a : b);
+    final maxX = offsets.map((o) => o.x).reduce((a, b) => a > b ? a : b);
+    final minY = offsets.map((o) => o.y).reduce((a, b) => a < b ? a : b);
+    final maxY = offsets.map((o) => o.y).reduce((a, b) => a > b ? a : b);
+
+    // 2. Clamp the origin so the whole shape stays inside the grid
+    //    (Assumes you have `gridWidth` and `gridHeight` in SandWorld - see note below)
+    final adjustedX = originX.clamp(-minX, cols - 1 - maxX);
+    final adjustedY = originY.clamp(-minY, rows - 1 - maxY);
+
+    // 3. Create the cells using the adjusted origin
     final cells = offsets.map((o) {
-      return Cell(originX + o.x, originY + o.y, color);
+      return Cell(adjustedX + o.x, adjustedY + o.y, color);
     }).toList();
 
     _createCluster(cells);
