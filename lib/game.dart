@@ -14,13 +14,13 @@ class SandGame extends FlameGame with TapCallbacks {
   double cellSize = 1;
   late Offset gridOffset;
 
-  final int cols = 40;
-  final int rows = 40;
+  final int cols = 80;
+  final int rows = 80;
 
   final Paint cellPaint = Paint()..color = Colors.orange;
 
   double _accumulator = 0;
-  static const double _step = 1 / 20;
+  static const double _step = 1 / 30;
 
   @override
   Future<void> onLoad() async {
@@ -67,20 +67,43 @@ class SandGame extends FlameGame with TapCallbacks {
     sandWorld.placeShape(_randomShape(), gridX, gridY);
   }
 
-  /// Generates a simple test shape (Tetris-like)
+  /// Generates a scaled Tetris-like test shape that looks the same size
+  /// on any grid dimensions (cols × rows).
   List<Point<int>> _randomShape() {
     final shapes = [
       // square
       [Point(0, 0), Point(1, 0), Point(0, 1), Point(1, 1)],
-
       // line
       [Point(0, 0), Point(1, 0), Point(2, 0), Point(3, 0)],
-
       // L shape
       [Point(0, 0), Point(0, 1), Point(0, 2), Point(1, 2)],
     ];
 
-    return shapes[DateTime.now().millisecond % shapes.length];
+    final baseShape = shapes[DateTime.now().millisecond % shapes.length];
+
+    // Dynamic scale based on grid width (you can tweak the divisor)
+    // Assuming a "standard" Tetris board of ~10 columns where the original
+    // shapes felt the right size. For cols=40 this gives scale=4.
+    int scale = cols ~/ 15; // 40 → 4
+    if (scale < 1) scale = 1; // safety for very small grids
+
+    // Optional: make it respect both dimensions (keeps aspect nice)
+    // scale = math.min(scale, rows ~/ 20);   // add if you import dart:math
+
+    return _scaleShape(baseShape, scale);
+  }
+
+  /// Expands each cell of a base shape into a solid scale×scale block.
+  List<Point<int>> _scaleShape(List<Point<int>> base, int scale) {
+    final scaled = <Point<int>>[];
+    for (final p in base) {
+      for (int dy = 0; dy < scale; dy++) {
+        for (int dx = 0; dx < scale; dx++) {
+          scaled.add(Point(p.x * scale + dx, p.y * scale + dy));
+        }
+      }
+    }
+    return scaled;
   }
 
   // =========================================================
