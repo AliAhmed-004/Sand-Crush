@@ -33,6 +33,8 @@ class SandGame extends FlameGame with TapCallbacks {
   double _accumulator = 0;
   static const double _step = 1 / 30;
 
+  bool _wasStableLastFrame = true;
+
   @override
   Future<void> onLoad() async {
     sandWorld = SandWorld(cols: cols, rows: rows);
@@ -134,6 +136,17 @@ class SandGame extends FlameGame with TapCallbacks {
       sandWorld.update(_step);
       _accumulator -= _step;
     }
+
+    // Only check bridges when the board has just become stable
+    if (sandWorld.isStable && !_wasStableLastFrame) {
+      for (final c in colors) {
+        if (sandWorld.clearSpanningBridge(c)) {
+          print('🚀 $c has formed a left-to-right bridge!');
+        }
+      }
+    }
+
+    _wasStableLastFrame = sandWorld.isStable;
   }
 
   // =========================================================

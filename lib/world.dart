@@ -40,8 +40,12 @@ class SandWorld {
 
   int _nextClusterId = 1;
 
+  bool _isStable = true;
+  bool get isStable => _isStable;
+
   SandWorld({required this.cols, required this.rows}) {
     grid = List.generate(rows, (_) => List.generate(cols, (_) => null));
+    _isStable = true;
   }
 
   // =========================================================
@@ -101,32 +105,39 @@ class SandWorld {
   // =========================================================
 
   void _applyClusterPhysics() {
-    // Process clusters in order (could be optimized with topological sort later)
     final clusterList = clusters.values.toList();
 
-    // Try to move each cluster down, down-left, or down-right
+    bool anyMovement = false; // ← NEW: track real movement
+
     for (final cluster in clusterList) {
-      // Skip if cluster was already removed in this frame
       if (!clusters.containsKey(cluster.id)) continue;
 
       // Try straight down first
       bool moved = _tryMoveCluster(cluster, 0, 1);
-
-      // If can't move down, try down-left
-      if (!moved) {
-        moved = _tryMoveCluster(cluster, -1, 1);
+      if (moved) {
+        anyMovement = true;
+        continue; // already moved, skip other directions
       }
 
-      // If can't move down-left, try down-right
-      if (!moved) {
-        moved = _tryMoveCluster(cluster, 1, 1);
+      // Then down-left
+      moved = _tryMoveCluster(cluster, -1, 1);
+      if (moved) {
+        anyMovement = true;
+        continue;
       }
 
-      // If all movement failed → it breaks apart and settles as sand
-      if (!moved) {
-        _breakApartCluster(cluster);
+      // Then down-right
+      moved = _tryMoveCluster(cluster, 1, 1);
+      if (moved) {
+        anyMovement = true;
+        continue;
       }
+
+      // Nothing could move → break apart (this does NOT count as movement)
+      _breakApartCluster(cluster);
     }
+
+    _isStable = !anyMovement; // ← NEW: stable = nothing actually moved
   }
 
   void _breakApartCluster(Cluster cluster) {
@@ -195,6 +206,158 @@ class SandWorld {
           grid[cell.y][cell.x] = cell.color;
         }
       }
+    }
+  }
+
+  /// Returns `true` if there is **any** connected group of cells with
+  /// the given `color` that touches both the left wall (x=0) and the
+  /// right wall (x = cols-1).
+  ///
+  /// Uses 4-way connectivity (up/down/left/right). Change the directions
+  /// array to 8-way if you want diagonal connections to count as "touching".
+  bool doesColorSpanLeftToRight(Color color) {
+    // Fast early-out: does this color even exist on both walls?
+    bool touchesLeft = false;
+    bool touchesRight = false;
+
+    for (int y = 0; y < rows; y++) {
+      if (grid[y][0] == color) touchesLeft = true;
+      if (grid[y][cols - 1] == color) touchesRight = true;
+    }
+    if (!touchesLeft || !touchesRight) return false;
+
+    // Flood-fill from the left wall
+    final visited = List.generate(rows, (_) => List.filled(cols, false));
+
+    final queue = <Point<int>>[]; // BFS queue
+
+    // Seed all cells on the left wall with this color
+    for (int y = 0; y < rows; y++) {
+      if (grid[y][0] == color && !visited[y][0]) {
+        visited[y][0] = true;
+        queue.add(Point(0, y));
+      }
+    }
+
+    const directions = [
+      // ← 4-way
+      Point(1, 0), Point(-1, 0),
+      Point(0, 1), Point(0, -1),
+      // For 8-way add these two lines:
+      // Point(1, 1), Point(1, -1),
+      // Point(-1, 1), Point(-1, -1),
+    ];
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeAt(0);
+
+      // We reached the right wall → bridge found!
+      if (current.x == cols - 1) return true;
+
+      for (final dir in directions) {
+        final nx = current.x + dir.x;
+        final ny = current.y + dir.y;
+
+        if (nx >= 0 &&
+            nx < cols &&
+            ny >= 0 &&
+            ny < rows &&
+            !visited[ny][nx] &&
+            grid[ny][nx] == color) {
+          visited[ny][nx] = true;
+          queue.add(Point(nx, ny));
+        }
+      }
+    }
+
+    return false; // no path reached the right wall
+  }
+
+  /// Clears ONLY the connected sand pile (same color) that spans
+  /// from the left wall to the right wall.
+  /// Returns `true` if a bridge was found and cleared.
+  bool clearSpanningBridge(Color color) {
+    // Fast early-out
+    bool touchesLeft = false;
+    bool touchesRight = false;
+    for (int y = 0; y < rows; y++) {
+      if (grid[y][0] == color) touchesLeft = true;
+      if (grid[y][cols - 1] == color) touchesRight = true;
+    }
+    if (!touchesLeft || !touchesRight) return false;
+
+    final visited = List.generate(rows, (_) => List.filled(cols, false));
+    final queue = <Point<int>>[];
+    final toClear = <Point<int>>[]; // ← only these cells will be removed
+
+    const directions = [
+      Point(1, 0), Point(-1, 0),
+      Point(0, 1), Point(0, -1),
+      // Point(1, 1), Point(1, -1), Point(-1, 1), Point(-1, -1), // 8-way if you want
+    ];
+
+    // Seed from left wall
+    for (int y = 0; y < rows; y++) {
+      if (grid[y][0] == color && !visited[y][0]) {
+        visited[y][0] = true;
+        queue.add(Point(0, y));
+        toClear.add(Point(0, y));
+      }
+    }
+
+    bool reachesRight = false;
+
+    while (queue.isNotEmpty) {
+      final current = queue.removeAt(0);
+
+      if (current.x == cols - 1) {
+        reachesRight = true;
+      }
+
+      for (final dir in directions) {
+        final nx = current.x + dir.x;
+        final ny = current.y + dir.y;
+
+        if (nx >= 0 &&
+            nx < cols &&
+            ny >= 0 &&
+            ny < rows &&
+            !visited[ny][nx] &&
+            grid[ny][nx] == color) {
+          visited[ny][nx] = true;
+          queue.add(Point(nx, ny));
+          toClear.add(Point(nx, ny));
+        }
+      }
+    }
+
+    if (!reachesRight) return false;
+
+    // === REMOVE ONLY THE BRIDGE CELLS ===
+    for (final p in toClear) {
+      grid[p.y][p.x] = null;
+      cellMap.remove(p);
+    }
+
+    // Clean up any clusters that lost cells (keeps physics consistent)
+    _cleanupStaleClusters();
+
+    return true;
+  }
+
+  /// Internal helper: remove clusters whose cells no longer exist
+  void _cleanupStaleClusters() {
+    final idsToRemove = <int>[];
+    for (final entry in clusters.entries) {
+      final cluster = entry.value;
+      final stillValid = cluster.cells.any((cell) {
+        final pt = Point(cell.x, cell.y);
+        return cellMap.containsKey(pt);
+      });
+      if (!stillValid) idsToRemove.add(entry.key);
+    }
+    for (final id in idsToRemove) {
+      clusters.remove(id);
     }
   }
 
