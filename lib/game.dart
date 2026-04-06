@@ -31,7 +31,7 @@ class SandGame extends FlameGame with TapCallbacks {
   final Paint cellPaint = Paint()..color = colors.random();
 
   double _accumulator = 0;
-  static const double _step = 1 / 60;
+  static const double _step = 1 / 30;
 
   bool _wasStableLastFrame = true;
 
@@ -89,24 +89,21 @@ class SandGame extends FlameGame with TapCallbacks {
   /// on any grid dimensions (cols × rows).
   List<Point<int>> _randomShape() {
     final shapes = [
-      // square
-      [Point(0, 0), Point(1, 0), Point(0, 1), Point(1, 1)],
-      // line
-      [Point(0, 0), Point(1, 0), Point(2, 0), Point(3, 0)],
-      // L shape
-      [Point(0, 0), Point(0, 1), Point(0, 2), Point(1, 2)],
+      // O (square) - already perfectly centered
+      [Point(-1, -1), Point(0, -1), Point(-1, 0), Point(0, 0)],
+
+      // I (line) horizontal - centered
+      [Point(-2, 0), Point(-1, 0), Point(0, 0), Point(1, 0)],
+
+      // L shape - centered as well as possible on a 4-block piece
+      [Point(-1, -1), Point(-1, 0), Point(-1, 1), Point(0, 1)],
     ];
 
     final baseShape = shapes[DateTime.now().millisecond % shapes.length];
 
-    // Dynamic scale based on grid width (you can tweak the divisor)
-    // Assuming a "standard" Tetris board of ~10 columns where the original
-    // shapes felt the right size. For cols=40 this gives scale=4.
-    int scale = cols ~/ 15; // 40 → 4
-    if (scale < 1) scale = 1; // safety for very small grids
-
-    // Optional: make it respect both dimensions (keeps aspect nice)
-    // scale = math.min(scale, rows ~/ 20);   // add if you import dart:math
+    // Keep your nice dynamic scaling
+    int scale = cols ~/ 15;
+    if (scale < 1) scale = 1;
 
     return _scaleShape(baseShape, scale);
   }

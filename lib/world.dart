@@ -58,6 +58,8 @@ class SandWorld {
   }
 
   /// Spawn a Tetris-like shape, automatically adjusted to fit entirely inside the grid.
+  /// Spawn a Tetris-like shape centered on the tap position.
+  /// The entire shape is guaranteed to fit inside the grid.
   void placeShape(
     List<Point<int>> offsets,
     int originX,
@@ -66,18 +68,17 @@ class SandWorld {
   ) {
     if (offsets.isEmpty) return;
 
-    // 1. Compute the shape's bounding box relative to its own origin
+    // Compute bounding box relative to the center (0,0)
     final minX = offsets.map((o) => o.x).reduce((a, b) => a < b ? a : b);
     final maxX = offsets.map((o) => o.x).reduce((a, b) => a > b ? a : b);
     final minY = offsets.map((o) => o.y).reduce((a, b) => a < b ? a : b);
     final maxY = offsets.map((o) => o.y).reduce((a, b) => a > b ? a : b);
 
-    // 2. Clamp the origin so the whole shape stays inside the grid
-    //    (Assumes you have `gridWidth` and `gridHeight` in SandWorld - see note below)
+    // Clamp the center point so the whole shape stays inside the grid
     final adjustedX = originX.clamp(-minX, cols - 1 - maxX);
     final adjustedY = originY.clamp(-minY, rows - 1 - maxY);
 
-    // 3. Create the cells using the adjusted origin
+    // Create cells with the adjusted center
     final cells = offsets.map((o) {
       return Cell(adjustedX + o.x, adjustedY + o.y, color);
     }).toList();
