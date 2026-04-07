@@ -121,49 +121,73 @@ class SandWorld {
 
   void _applyClusterPhysics() {
     final clusterList = clusters.values.toList();
-
-    bool anyMovement = false; // ← NEW: track real movement
+    bool anyMovement = false;
 
     for (final cluster in clusterList) {
       if (!clusters.containsKey(cluster.id)) continue;
 
-      // Try straight down first
-      bool moved = _tryMoveCluster(cluster, 0, 1);
-      if (moved) {
+      // 1. Try straight down
+      if (_tryMoveCluster(cluster, 0, 1)) {
         anyMovement = true;
-        continue; // already moved, skip other directions
+        continue;
       }
 
-      // Then down-left
-      moved = _tryMoveCluster(cluster, -1, 1);
+      // 2. Straight down blocked → try diagonal slide (but only if the whole cluster stays supported)
+      final leftFirst = Random().nextBool();
+      bool moved = false;
+
+      if (leftFirst) {
+        if (_isClusterSupportedAfterMove(cluster, -1, 1) &&
+            _tryMoveCluster(cluster, -1, 1)) {
+          moved = true;
+        } else if (_isClusterSupportedAfterMove(cluster, 1, 1) &&
+            _tryMoveCluster(cluster, 1, 1)) {
+          moved = true;
+        }
+      } else {
+        if (_isClusterSupportedAfterMove(cluster, 1, 1) &&
+            _tryMoveCluster(cluster, 1, 1)) {
+          moved = true;
+        } else if (_isClusterSupportedAfterMove(cluster, -1, 1) &&
+            _tryMoveCluster(cluster, -1, 1)) {
+          moved = true;
+        }
+      }
+
       if (moved) {
         anyMovement = true;
         continue;
       }
 
-      // Then down-right
-      moved = _tryMoveCluster(cluster, 1, 1);
-      if (moved) {
-        anyMovement = true;
+      // 3. No valid move possible (down or supported diagonal) → break apart if it's a multi-cell cluster
+      if (cluster.cells.length > 1) {
+        _breakApartCluster(cluster);
         continue;
       }
-
-      // Nothing could move → break apart (this does NOT count as movement)
-      _breakApartCluster(cluster);
     }
 
-    _isStable = !anyMovement; // ← NEW: stable = nothing actually moved
+    _isStable = !anyMovement;
   }
 
   void _breakApartCluster(Cluster cluster) {
-    // Remove the cluster from active simulation
+    if (cluster.cells.isEmpty) {
+      clusters.remove(cluster.id);
+      return;
+    }
+
+    // Remove the old cluster completely first
     clusters.remove(cluster.id);
 
-    // Create a single-cell cluster for each cell to settle independently
+    // Clear its positions from the fast lookup
+    for (final cell in cluster.cells) {
+      cellMap.remove(Point(cell.x, cell.y));
+    }
+
+    // Now create independent single-cell clusters
     for (final cell in cluster.cells) {
       if (!isInside(cell.x, cell.y)) continue;
 
-      // Create a new cluster with just this cell
+      // Always create a new single-cell cluster (positions were already cleared above)
       _createCluster([Cell(cell.x, cell.y, cell.color)]);
     }
   }
@@ -257,12 +281,11 @@ class SandWorld {
     }
 
     const directions = [
-      // ← 4-way
+      // ← 8-way
       Point(1, 0), Point(-1, 0),
       Point(0, 1), Point(0, -1),
-      // For 8-way add these two lines:
-      // Point(1, 1), Point(1, -1),
-      // Point(-1, 1), Point(-1, -1),
+      Point(1, 1), Point(1, -1),
+      Point(-1, 1), Point(-1, -1),
     ];
 
     while (queue.isNotEmpty) {
@@ -294,8 +317,12 @@ class SandWorld {
   /// from the left wall to the right wall.
   /// Returns `true` if a bridge was found and cleared.
   bool clearSpanningBridge(Color color) {
-    if (!doesColorSpanLeftToRight(color)) return false; // only clear if a bridge exists
-    if (!_isStable) return false; // only clear when stable to avoid weird edge cases
+    if (!doesColorSpanLeftToRight(color)) {
+      return false; // only clear if a bridge exists
+    }
+    if (!_isStable) {
+      return false; // only clear when stable to avoid weird edge cases
+    }
 
     // Fast early-out
     bool touchesLeft = false;
@@ -389,5 +416,40 @@ class SandWorld {
   void rebuildClustersFromGrid() {
     // intentionally left empty for now
     // (this is where flood-fill clustering would go later)
+  }
+
+  /// Returns true if the cluster would be fully supported AFTER a potential move (dx, dy).
+  /// "Supported" means every cell either:
+  ///   - Has a cell directly below it (in the new position), or
+  ///   - Is blocked from falling by the world bottom or another cluster.
+  bool _isClusterSupportedAfterMove(Cluster cluster, int dx, int dy) {
+    // Temporarily imagine the new positions
+    for (final cell in cluster.cells) {
+      final nx = cell.x + dx;
+      final ny = cell.y + dy;
+
+      if (!isInside(nx, ny)) {
+        return false; // would go out of bounds
+      }
+
+      // Check if this cell has support below in the *new* position
+      final belowX = nx;
+      final belowY = ny + 1;
+
+      if (belowY >= rows) {
+        continue; // on the floor = supported
+      }
+
+      final belowPoint = Point(belowX, belowY);
+      final occupant = cellMap[belowPoint];
+
+      if (occupant != null && occupant != cluster.id) {
+        continue; // supported by another cluster
+      }
+
+      // No support below → this cell would be floating after the move
+      return false;
+    }
+    return true; // all cells have support
   }
 }
