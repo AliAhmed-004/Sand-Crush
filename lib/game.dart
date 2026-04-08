@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
+import 'dart:ui' as ui;
 
 import 'package:flame/events.dart';
 import 'package:flame/extensions.dart';
@@ -35,7 +36,7 @@ class SandGame extends FlameGame with TapCallbacks {
 
   // Fixed timestep accumulator
   double _accumulator = 0;
-  static const double _step = 1 / 60;
+  static const double _step = 1 / 24;
 
   // Track stability to trigger bridge checks only when the board transitions from unstable to stable
   bool _wasStableLastFrame = true;
@@ -50,6 +51,15 @@ class SandGame extends FlameGame with TapCallbacks {
 
   bool _isLoaded = false;
 
+  // Performance optimization: cached NEXT TextPainter
+  late TextPainter _nextTextPainter;
+
+  // Performance optimization: cached grid lines as Picture
+  late ui.Picture _gridLinesPicture;
+  double _lastGridLinesOffsetX = -1;
+  double _lastGridLinesOffsetY = -1;
+  double _lastGridLinesScale = -1;
+
   @override
   Future<void> onLoad() async {
     sandWorld = SandWorld(cols: cols, rows: rows);
@@ -58,6 +68,21 @@ class SandGame extends FlameGame with TapCallbacks {
     // Pre-allocate buffers for vertices (2 triangles per cell = 6 vertices, each with x,y)
     _vertices = Float32List(cols * rows * 12);
     _colors = Int32List(cols * rows * 6);
+
+    // Initialize and layout NEXT TextPainter once
+    _nextTextPainter = TextPainter(
+      text: const TextSpan(
+        text: "NEXT",
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    _nextTextPainter.layout();
+
     _isLoaded = true;
 
     // Run initial update if resize happened already
@@ -95,6 +120,10 @@ class SandGame extends FlameGame with TapCallbacks {
     // Recompute static vertex positions if buffers are ready
     if (_isLoaded) {
       _updateVertexPositions();
+      // Invalidate cached grid lines picture when size changes
+      _lastGridLinesOffsetX = -1;
+      _lastGridLinesOffsetY = -1;
+      _lastGridLinesScale = -1;
     }
   }
 
@@ -186,6 +215,9 @@ class SandGame extends FlameGame with TapCallbacks {
     }
 
     if (sandWorld.isStable && !_wasStableLastFrame) {
+      // Merge adjacent same-color clusters to reduce fragmentation
+      sandWorld.mergeAdjacentClusters();
+
       for (final c in colors) {
         if (sandWorld.clearSpanningBridge(c)) {
           // print('🚀 $c has formed a left-to-right bridge!');
@@ -228,27 +260,43 @@ class SandGame extends FlameGame with TapCallbacks {
   }
 
   void _drawGridLines(Canvas canvas) {
-    final paint = Paint()
-      ..color = Colors.white12
-      ..style = PaintingStyle.stroke;
+    // Regenerate grid lines picture only if offset or scale changed
+    if (_lastGridLinesOffsetX != gridOffset.dx ||
+        _lastGridLinesOffsetY != gridOffset.dy ||
+        _lastGridLinesScale != cellSize) {
+      final recorder = ui.PictureRecorder();
+      final recordingCanvas = Canvas(recorder);
 
-    for (int x = 0; x <= cols; x++) {
-      final dx = gridOffset.dx + x * cellSize;
-      canvas.drawLine(
-        Offset(dx, gridOffset.dy),
-        Offset(dx, gridOffset.dy + rows * cellSize),
-        paint,
-      );
+      final paint = Paint()
+        ..color = Colors.white12
+        ..style = PaintingStyle.stroke;
+
+      for (int x = 0; x <= cols; x++) {
+        final dx = gridOffset.dx + x * cellSize;
+        recordingCanvas.drawLine(
+          Offset(dx, gridOffset.dy),
+          Offset(dx, gridOffset.dy + rows * cellSize),
+          paint,
+        );
+      }
+
+      for (int y = 0; y <= rows; y++) {
+        final dy = gridOffset.dy + y * cellSize;
+        recordingCanvas.drawLine(
+          Offset(gridOffset.dx, dy),
+          Offset(gridOffset.dx + cols * cellSize, dy),
+          paint,
+        );
+      }
+
+      _gridLinesPicture = recorder.endRecording();
+      _lastGridLinesOffsetX = gridOffset.dx;
+      _lastGridLinesOffsetY = gridOffset.dy;
+      _lastGridLinesScale = cellSize;
     }
 
-    for (int y = 0; y <= rows; y++) {
-      final dy = gridOffset.dy + y * cellSize;
-      canvas.drawLine(
-        Offset(gridOffset.dx, dy),
-        Offset(gridOffset.dx + cols * cellSize, dy),
-        paint,
-      );
-    }
+    // Draw the cached grid lines picture
+    canvas.drawPicture(_gridLinesPicture);
   }
 
   void _drawNextPiecePreview(Canvas canvas) {
@@ -272,21 +320,13 @@ class SandGame extends FlameGame with TapCallbacks {
         ..strokeWidth = 3,
     );
 
-    final textPainter = TextPainter(
-      text: const TextSpan(
-        text: "NEXT",
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    textPainter.paint(
+    // Use cached NEXT TextPainter instead of creating new one every frame
+    _nextTextPainter.paint(
       canvas,
-      Offset(previewX + (previewSize - textPainter.width) / 2, previewY - 28),
+      Offset(
+        previewX + (previewSize - _nextTextPainter.width) / 2,
+        previewY - 28,
+      ),
     );
 
     if (nextShape.isEmpty) return;

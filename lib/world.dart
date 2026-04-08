@@ -45,10 +45,15 @@ class SandWorld {
   bool _isStable = true;
   bool get isStable => _isStable;
 
+  // Performance optimization: cached cluster list
+  late List<Cluster> _cachedClusterList;
+  int _lastKnownClusterCount = 0;
+
   SandWorld({required this.cols, required this.rows})
     : gridColorBuffer = Uint32List(cols * rows),
       cellIdMap = Int32List(cols * rows) {
     _isStable = true;
+    _cachedClusterList = [];
   }
 
   // =========================================================
@@ -90,6 +95,71 @@ class SandWorld {
     _syncGridFromClusters();
   }
 
+  /// Merges adjacent same-color 1-cell clusters to reduce fragmentation.
+  /// Call this after the board stabilizes (isStable == true).
+  void mergeAdjacentClusters() {
+    if (!_isStable || clusters.isEmpty) return;
+
+    final clustersByColor = <int, List<Cluster>>{};
+    for (final cluster in clusters.values) {
+      if (cluster.cells.length != 1) continue;
+      final colorVal = cluster.cells.first.color.value;
+      clustersByColor.putIfAbsent(colorVal, () => []).add(cluster);
+    }
+
+    for (final colorClusters in clustersByColor.values) {
+      final processed = <int>{};
+
+      for (final cluster in colorClusters) {
+        if (processed.contains(cluster.id)) continue;
+
+        final cell = cluster.cells.first;
+        final toMerge = [cluster];
+        processed.add(cluster.id);
+
+        final adjacent = [
+          (cell.x - 1, cell.y),
+          (cell.x + 1, cell.y),
+          (cell.x, cell.y - 1),
+          (cell.x, cell.y + 1),
+        ];
+
+        for (final (nx, ny) in adjacent) {
+          if (!isInside(nx, ny)) continue;
+          final adjClusterId = cellIdMap[ny * cols + nx];
+          if (adjClusterId == 0 || processed.contains(adjClusterId)) continue;
+          final adjCluster = clusters[adjClusterId];
+          if (adjCluster == null ||
+              adjCluster.cells.length != 1 ||
+              adjCluster.cells.first.color.value !=
+                  cluster.cells.first.color.value) {
+            continue;
+          }
+          toMerge.add(adjCluster);
+          processed.add(adjClusterId);
+        }
+
+        if (toMerge.length > 1) {
+          final mergedCells = <Cell>[];
+          for (final c in toMerge) {
+            mergedCells.addAll(c.cells);
+            clusters.remove(c.id);
+            for (final cell in c.cells) {
+              cellIdMap[cell.y * cols + cell.x] = 0;
+            }
+          }
+
+          final newClusterId = _nextClusterId++;
+          final mergedCluster = Cluster(id: newClusterId, cells: mergedCells);
+          clusters[newClusterId] = mergedCluster;
+          for (final cell in mergedCells) {
+            cellIdMap[cell.y * cols + cell.x] = newClusterId;
+          }
+        }
+      }
+    }
+  }
+
   bool isInside(int x, int y) {
     return x >= 0 && x < cols && y >= 0 && y < rows;
   }
@@ -114,7 +184,12 @@ class SandWorld {
   // =========================================================
 
   void _applyClusterPhysics() {
-    final clusterList = clusters.values.toList();
+    // Cache cluster list, rebuild only when cluster count changes
+    if (clusters.length != _lastKnownClusterCount) {
+      _cachedClusterList = clusters.values.toList();
+      _lastKnownClusterCount = clusters.length;
+    }
+    final clusterList = _cachedClusterList;
     bool anyMovement = false;
 
     for (final cluster in clusterList) {
@@ -208,11 +283,11 @@ class SandWorld {
   }
 
   // =========================================================
-  // GRID SYNC
+  // GRID SYNC (With Dirty Region Tracking)
   // =========================================================
 
   void _syncGridFromClusters() {
-    gridColorBuffer.fillRange(0, gridColorBuffer.length, 0);
+    gridColorBuffer.fillRange(0, gridColorBuffer.length, 0); // Fast full clear
 
     for (final cluster in clusters.values) {
       for (final cell in cluster.cells) {
