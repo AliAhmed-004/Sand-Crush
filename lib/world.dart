@@ -345,8 +345,9 @@ class SandWorld {
         if (nextIdx < 0 || nextIdx >= rows * cols) continue;
 
         final nx = nextIdx % cols;
-        if ((cx == 0 && (nx == cols - 1)) || (cx == cols - 1 && (nx == 0)))
+        if ((cx == 0 && (nx == cols - 1)) || (cx == cols - 1 && (nx == 0))) {
           continue;
+        }
 
         if (visited[nextIdx] == 0 && gridColorBuffer[nextIdx] == colorVal) {
           visited[nextIdx] = 1;
@@ -361,13 +362,14 @@ class SandWorld {
   bool clearSpanningBridge(Color color) {
     if (!_isStable) return false;
 
-    final colorVal = color.value;
+    final colorVal = color.toARGB32();
     bool touchesLeft = false;
     bool touchesRight = false;
     for (int y = 0; y < rows; y++) {
       if (gridColorBuffer[y * cols] == colorVal) touchesLeft = true;
-      if (gridColorBuffer[y * cols + (cols - 1)] == colorVal)
+      if (gridColorBuffer[y * cols + (cols - 1)] == colorVal) {
         touchesRight = true;
+      }
     }
     if (!touchesLeft || !touchesRight) return false;
 
@@ -385,7 +387,17 @@ class SandWorld {
     }
 
     bool reachesRight = false;
-    final neighbors = [1, -1, cols, -cols];
+    // 8-directional neighbors to ensure we clear diagonally connected bridges as well
+    final neighbors = [
+      1,
+      -1,
+      cols,
+      -cols,
+      cols + 1,
+      cols - 1,
+      -cols + 1,
+      -cols - 1,
+    ];
 
     int head = 0;
     while (head < queue.length) {
@@ -398,8 +410,9 @@ class SandWorld {
         if (nextIdx < 0 || nextIdx >= rows * cols) continue;
 
         final nx = nextIdx % cols;
-        if ((cx == 0 && (nx == cols - 1)) || (cx == cols - 1 && (nx == 0)))
+        if ((cx == 0 && (nx == cols - 1)) || (cx == cols - 1 && (nx == 0))) {
           continue;
+        }
 
         if (visited[nextIdx] == 0 && gridColorBuffer[nextIdx] == colorVal) {
           visited[nextIdx] = 1;
