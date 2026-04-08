@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'dart:ui';
 
 /// -----------------------------
@@ -7,7 +8,7 @@ import 'dart:ui';
 class Cell {
   int x;
   int y;
-  final Color color; // ← NEW: every grain remembers its color
+  final Color color;
 
   Cell(this.x, this.y, this.color);
 }
@@ -29,22 +30,24 @@ class SandWorld {
   final int cols;
   final int rows;
 
-  /// Grid is now ONLY for rendering lookup (not physics truth)
-  late List<List<Color?>> grid;
+  /// Optimized grid for rendering: flat ABGR/ARGB color buffer
+  final Uint32List gridColorBuffer;
 
   /// Active clusters in the world
   final Map<int, Cluster> clusters = {};
 
-  /// Fast lookup: (x,y) → clusterId
-  final Map<Point<int>, int> cellMap = {};
+  /// Optimized lookup: index (y * cols + x) → clusterId
+  /// Value of 0 means empty.
+  final Int32List cellIdMap;
 
   int _nextClusterId = 1;
 
   bool _isStable = true;
   bool get isStable => _isStable;
 
-  SandWorld({required this.cols, required this.rows}) {
-    grid = List.generate(rows, (_) => List.generate(cols, (_) => null));
+  SandWorld({required this.cols, required this.rows})
+    : gridColorBuffer = Uint32List(cols * rows),
+      cellIdMap = Int32List(cols * rows) {
     _isStable = true;
   }
 
@@ -52,14 +55,10 @@ class SandWorld {
   // PUBLIC API
   // =========================================================
 
-  /// Spawn a single cell as its own cluster (old behavior compatibility)
   void placeCell(int x, int y, Color color) {
     _createCluster([Cell(x, y, color)]);
   }
 
-  /// Spawn a Tetris-like shape, automatically adjusted to fit entirely inside the grid.
-  /// Spawn a Tetris-like shape centered on the tap position.
-  /// The entire shape is guaranteed to fit inside the grid.
   void placeShape(
     List<Point<int>> offsets,
     int originX,
@@ -68,17 +67,17 @@ class SandWorld {
   ) {
     if (offsets.isEmpty) return;
 
-    // Compute bounding box relative to the center (0,0)
-    final minX = offsets.map((o) => o.x).reduce((a, b) => a < b ? a : b);
-    final maxX = offsets.map((o) => o.x).reduce((a, b) => a > b ? a : b);
-    final minY = offsets.map((o) => o.y).reduce((a, b) => a < b ? a : b);
-    final maxY = offsets.map((o) => o.y).reduce((a, b) => a > b ? a : b);
+    int minX = 0, maxX = 0, minY = 0, maxY = 0;
+    for (final o in offsets) {
+      if (o.x < minX) minX = o.x;
+      if (o.x > maxX) maxX = o.x;
+      if (o.y < minY) minY = o.y;
+      if (o.y > maxY) maxY = o.y;
+    }
 
-    // Clamp the center point so the whole shape stays inside the grid
     final adjustedX = originX.clamp(-minX, cols - 1 - maxX);
     final adjustedY = originY.clamp(-minY, rows - 1 - maxY);
 
-    // Create cells with the adjusted center
     final cells = offsets.map((o) {
       return Cell(adjustedX + o.x, adjustedY + o.y, color);
     }).toList();
@@ -86,13 +85,11 @@ class SandWorld {
     _createCluster(cells);
   }
 
-  /// Update simulation
   void update(double dt) {
     _applyClusterPhysics();
     _syncGridFromClusters();
   }
 
-  /// Bounds check
   bool isInside(int x, int y) {
     return x >= 0 && x < cols && y >= 0 && y < rows;
   }
@@ -103,15 +100,12 @@ class SandWorld {
 
   void _createCluster(List<Cell> cells) {
     final id = _nextClusterId++;
-
     final cluster = Cluster(id: id, cells: cells);
-
     clusters[id] = cluster;
 
     for (final c in cells) {
       if (!isInside(c.x, c.y)) continue;
-
-      cellMap[Point(c.x, c.y)] = id;
+      cellIdMap[c.y * cols + c.x] = id;
     }
   }
 
@@ -126,13 +120,11 @@ class SandWorld {
     for (final cluster in clusterList) {
       if (!clusters.containsKey(cluster.id)) continue;
 
-      // 1. Try straight down
       if (_tryMoveCluster(cluster, 0, 1)) {
         anyMovement = true;
         continue;
       }
 
-      // 2. Straight down blocked → try diagonal slide (but only if the whole cluster stays supported)
       final leftFirst = Random().nextBool();
       bool moved = false;
 
@@ -159,7 +151,6 @@ class SandWorld {
         continue;
       }
 
-      // 3. No valid move possible (down or supported diagonal) → break apart if it's a multi-cell cluster
       if (cluster.cells.length > 1) {
         _breakApartCluster(cluster);
         continue;
@@ -175,232 +166,196 @@ class SandWorld {
       return;
     }
 
-    // Remove the old cluster completely first
     clusters.remove(cluster.id);
 
-    // Clear its positions from the fast lookup
     for (final cell in cluster.cells) {
-      cellMap.remove(Point(cell.x, cell.y));
+      cellIdMap[cell.y * cols + cell.x] = 0;
     }
 
-    // Now create independent single-cell clusters
     for (final cell in cluster.cells) {
       if (!isInside(cell.x, cell.y)) continue;
-
-      // Always create a new single-cell cluster (positions were already cleared above)
       _createCluster([Cell(cell.x, cell.y, cell.color)]);
     }
   }
 
   bool _tryMoveCluster(Cluster cluster, int dx, int dy) {
-    // 1. Check collision
     for (final cell in cluster.cells) {
       final nx = cell.x + dx;
       final ny = cell.y + dy;
 
       if (!isInside(nx, ny)) return false;
 
-      final existing = cellMap[Point(nx, ny)];
-
-      if (existing != null && existing != cluster.id) {
+      final existingId = cellIdMap[ny * cols + nx];
+      if (existingId != 0 && existingId != cluster.id) {
         return false;
       }
     }
 
-    // 2. Remove old positions
     for (final cell in cluster.cells) {
-      cellMap.remove(Point(cell.x, cell.y));
+      cellIdMap[cell.y * cols + cell.x] = 0;
     }
 
-    // 3. Move cluster
     for (final cell in cluster.cells) {
       cell.x += dx;
       cell.y += dy;
     }
 
-    // 4. Re-register positions
     for (final cell in cluster.cells) {
-      cellMap[Point(cell.x, cell.y)] = cluster.id;
+      cellIdMap[cell.y * cols + cell.x] = cluster.id;
     }
 
     return true;
   }
 
   // =========================================================
-  // GRID SYNC (FOR YOUR CURRENT RENDERER)
+  // GRID SYNC
   // =========================================================
 
   void _syncGridFromClusters() {
-    // reset grid
-    for (int y = 0; y < rows; y++) {
-      for (int x = 0; x < cols; x++) {
-        grid[y][x] = null;
-      }
-    }
+    gridColorBuffer.fillRange(0, gridColorBuffer.length, 0);
 
-    // rebuild from clusters
     for (final cluster in clusters.values) {
       for (final cell in cluster.cells) {
         if (isInside(cell.x, cell.y)) {
-          grid[cell.y][cell.x] = cell.color;
+          gridColorBuffer[cell.y * cols + cell.x] = cell.color.value;
         }
       }
     }
   }
 
-  /// Returns `true` if there is **any** connected group of cells with
-  /// the given `color` that touches both the left wall (x=0) and the
-  /// right wall (x = cols-1).
-  ///
-  /// Uses 4-way connectivity (up/down/left/right). Change the directions
-  /// array to 8-way if you want diagonal connections to count as "touching".
   bool doesColorSpanLeftToRight(Color color) {
-    if (!_isStable) return false; // only check for bridges when stable
+    if (!_isStable) return false;
 
-    // Fast early-out: does this color even exist on both walls?
+    final colorVal = color.value;
     bool touchesLeft = false;
     bool touchesRight = false;
-
     for (int y = 0; y < rows; y++) {
-      if (grid[y][0] == color) touchesLeft = true;
-      if (grid[y][cols - 1] == color) touchesRight = true;
+      if (gridColorBuffer[y * cols] == colorVal) touchesLeft = true;
+      if (gridColorBuffer[y * cols + (cols - 1)] == colorVal)
+        touchesRight = true;
     }
     if (!touchesLeft || !touchesRight) return false;
 
-    // Flood-fill from the left wall
-    final visited = List.generate(rows, (_) => List.filled(cols, false));
+    final visited = Uint8List(rows * cols);
+    final queue = <int>[];
 
-    final queue = <Point<int>>[]; // BFS queue
-
-    // Seed all cells on the left wall with this color
     for (int y = 0; y < rows; y++) {
-      if (grid[y][0] == color && !visited[y][0]) {
-        visited[y][0] = true;
-        queue.add(Point(0, y));
+      final idx = y * cols;
+      if (gridColorBuffer[idx] == colorVal) {
+        visited[idx] = 1;
+        queue.add(idx);
       }
     }
 
-    const directions = [
-      // ← 8-way
-      Point(1, 0), Point(-1, 0),
-      Point(0, 1), Point(0, -1),
-      Point(1, 1), Point(1, -1),
-      Point(-1, 1), Point(-1, -1),
+    final neighbors = [
+      1,
+      -1,
+      cols,
+      -cols,
+      cols + 1,
+      cols - 1,
+      -cols + 1,
+      -cols - 1,
     ];
 
-    while (queue.isNotEmpty) {
-      final current = queue.removeAt(0);
+    int head = 0;
+    while (head < queue.length) {
+      final currIdx = queue[head++];
+      final cx = currIdx % cols;
 
-      // We reached the right wall → bridge found!
-      if (current.x == cols - 1) return true;
+      if (cx == cols - 1) return true;
 
-      for (final dir in directions) {
-        final nx = current.x + dir.x;
-        final ny = current.y + dir.y;
+      for (final offset in neighbors) {
+        final nextIdx = currIdx + offset;
+        if (nextIdx < 0 || nextIdx >= rows * cols) continue;
 
-        if (nx >= 0 &&
-            nx < cols &&
-            ny >= 0 &&
-            ny < rows &&
-            !visited[ny][nx] &&
-            grid[ny][nx] == color) {
-          visited[ny][nx] = true;
-          queue.add(Point(nx, ny));
+        final nx = nextIdx % cols;
+        if ((cx == 0 && (nx == cols - 1)) || (cx == cols - 1 && (nx == 0)))
+          continue;
+
+        if (visited[nextIdx] == 0 && gridColorBuffer[nextIdx] == colorVal) {
+          visited[nextIdx] = 1;
+          queue.add(nextIdx);
         }
       }
     }
 
-    return false; // no path reached the right wall
+    return false;
   }
 
-  /// Clears ONLY the connected sand pile (same color) that spans
-  /// from the left wall to the right wall.
-  /// Returns `true` if a bridge was found and cleared.
   bool clearSpanningBridge(Color color) {
-    if (!doesColorSpanLeftToRight(color)) {
-      return false; // only clear if a bridge exists
-    }
-    if (!_isStable) {
-      return false; // only clear when stable to avoid weird edge cases
-    }
+    if (!_isStable) return false;
 
-    // Fast early-out
+    final colorVal = color.value;
     bool touchesLeft = false;
     bool touchesRight = false;
     for (int y = 0; y < rows; y++) {
-      if (grid[y][0] == color) touchesLeft = true;
-      if (grid[y][cols - 1] == color) touchesRight = true;
+      if (gridColorBuffer[y * cols] == colorVal) touchesLeft = true;
+      if (gridColorBuffer[y * cols + (cols - 1)] == colorVal)
+        touchesRight = true;
     }
     if (!touchesLeft || !touchesRight) return false;
 
-    final visited = List.generate(rows, (_) => List.filled(cols, false));
-    final queue = <Point<int>>[];
-    final toClear = <Point<int>>[]; // ← only these cells will be removed
+    final visited = Uint8List(rows * cols);
+    final queue = <int>[];
+    final toClear = <int>[];
 
-    const directions = [
-      Point(1, 0), Point(-1, 0),
-      Point(0, 1), Point(0, -1),
-      // Point(1, 1), Point(1, -1), Point(-1, 1), Point(-1, -1), // 8-way if you want
-    ];
-
-    // Seed from left wall
     for (int y = 0; y < rows; y++) {
-      if (grid[y][0] == color && !visited[y][0]) {
-        visited[y][0] = true;
-        queue.add(Point(0, y));
-        toClear.add(Point(0, y));
+      final idx = y * cols;
+      if (gridColorBuffer[idx] == colorVal) {
+        visited[idx] = 1;
+        queue.add(idx);
+        toClear.add(idx);
       }
     }
 
     bool reachesRight = false;
+    final neighbors = [1, -1, cols, -cols];
 
-    while (queue.isNotEmpty) {
-      final current = queue.removeAt(0);
+    int head = 0;
+    while (head < queue.length) {
+      final currIdx = queue[head++];
+      final cx = currIdx % cols;
+      if (cx == cols - 1) reachesRight = true;
 
-      if (current.x == cols - 1) {
-        reachesRight = true;
-      }
+      for (final offset in neighbors) {
+        final nextIdx = currIdx + offset;
+        if (nextIdx < 0 || nextIdx >= rows * cols) continue;
 
-      for (final dir in directions) {
-        final nx = current.x + dir.x;
-        final ny = current.y + dir.y;
+        final nx = nextIdx % cols;
+        if ((cx == 0 && (nx == cols - 1)) || (cx == cols - 1 && (nx == 0)))
+          continue;
 
-        if (nx >= 0 &&
-            nx < cols &&
-            ny >= 0 &&
-            ny < rows &&
-            !visited[ny][nx] &&
-            grid[ny][nx] == color) {
-          visited[ny][nx] = true;
-          queue.add(Point(nx, ny));
-          toClear.add(Point(nx, ny));
+        if (visited[nextIdx] == 0 && gridColorBuffer[nextIdx] == colorVal) {
+          visited[nextIdx] = 1;
+          queue.add(nextIdx);
+          toClear.add(nextIdx);
         }
       }
     }
 
     if (!reachesRight) return false;
 
-    // === REMOVE ONLY THE BRIDGE CELLS ===
-    for (final p in toClear) {
-      grid[p.y][p.x] = null;
-      cellMap.remove(p);
+    for (final idx in toClear) {
+      gridColorBuffer[idx] = 0;
+      cellIdMap[idx] = 0;
     }
 
-    // Clean up any clusters that lost cells (keeps physics consistent)
     _cleanupStaleClusters();
-
     return true;
   }
 
-  /// Internal helper: remove clusters whose cells no longer exist
   void _cleanupStaleClusters() {
     final idsToRemove = <int>[];
     for (final entry in clusters.entries) {
       final cluster = entry.value;
-      final stillValid = cluster.cells.any((cell) {
-        final pt = Point(cell.x, cell.y);
-        return cellMap.containsKey(pt);
-      });
+      bool stillValid = false;
+      for (final cell in cluster.cells) {
+        if (cellIdMap[cell.y * cols + cell.x] == entry.key) {
+          stillValid = true;
+          break;
+        }
+      }
       if (!stillValid) idsToRemove.add(entry.key);
     }
     for (final id in idsToRemove) {
@@ -408,48 +363,25 @@ class SandWorld {
     }
   }
 
-  // =========================================================
-  // OPTIONAL: FUTURE SPLIT SUPPORT (SAFE PLACEHOLDER)
-  // =========================================================
-
-  /// Later upgrade: if clusters break apart, rebuild them here.
-  void rebuildClustersFromGrid() {
-    // intentionally left empty for now
-    // (this is where flood-fill clustering would go later)
-  }
-
-  /// Returns true if the cluster would be fully supported AFTER a potential move (dx, dy).
-  /// "Supported" means every cell either:
-  ///   - Has a cell directly below it (in the new position), or
-  ///   - Is blocked from falling by the world bottom or another cluster.
   bool _isClusterSupportedAfterMove(Cluster cluster, int dx, int dy) {
-    // Temporarily imagine the new positions
     for (final cell in cluster.cells) {
       final nx = cell.x + dx;
       final ny = cell.y + dy;
 
-      if (!isInside(nx, ny)) {
-        return false; // would go out of bounds
-      }
+      if (!isInside(nx, ny)) return false;
 
-      // Check if this cell has support below in the *new* position
       final belowX = nx;
       final belowY = ny + 1;
 
-      if (belowY >= rows) {
-        continue; // on the floor = supported
-      }
+      if (belowY >= rows) continue;
 
-      final belowPoint = Point(belowX, belowY);
-      final occupant = cellMap[belowPoint];
+      final belowIdx = belowY * cols + belowX;
+      final occupantId = cellIdMap[belowIdx];
 
-      if (occupant != null && occupant != cluster.id) {
-        continue; // supported by another cluster
-      }
+      if (occupantId != 0 && occupantId != cluster.id) continue;
 
-      // No support below → this cell would be floating after the move
       return false;
     }
-    return true; // all cells have support
+    return true;
   }
 }
