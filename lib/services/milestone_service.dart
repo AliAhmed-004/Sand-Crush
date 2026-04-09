@@ -6,7 +6,7 @@
 /// Milestone 2: 50,001-75,000 points
 /// And so on...
 class MilestoneService {
-  static const int _milestoneThreshold = 25000;
+  static const int _milestoneThreshold = 500;
 
   // Singleton pattern
   static final MilestoneService _instance = MilestoneService._internal();

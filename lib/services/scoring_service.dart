@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 /// A service to manage the scoring system of the game.
 ///
@@ -10,14 +11,15 @@ class ScoringService {
   // Base points awarded for placing a block or clearing a pile of sand
   final int _basePoints = 10;
 
-  // Total score of the player
-  int totalScore = 0;
+  // Total score notifier
+  final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
 
   // Combo tracking for pile clears
   int _currentComboCount = 0;
   bool _isInComboSession = false;
 
-  int get currentScore => totalScore;
+  int get currentScore => _scoreNotifier.value;
+  ValueNotifier<int> get scoreNotifier => _scoreNotifier;
 
   // Singleton pattern
   static final ScoringService _instance = ScoringService._internal();
@@ -33,8 +35,8 @@ class ScoringService {
 
   /// Method to add points for placing a block
   void addBlockPlacementPoints() {
-    totalScore += _basePoints;
-    print('Block placed! Current score: $totalScore');
+    _scoreNotifier.value += _basePoints;
+    print('Block placed! Current score: ${_scoreNotifier.value}');
   }
 
   /// Starts a new clear session. Call this when checking for pile clears.
@@ -55,10 +57,10 @@ class ScoringService {
     double comboBonus = 1.0 + (_currentComboCount * 0.1);
 
     int points = (_basePoints * multiplier * comboBonus).toInt();
-    totalScore += points;
+    _scoreNotifier.value += points;
 
     print(
-        'Cleared pile of size $pileSize (combo ×${comboBonus.toStringAsFixed(1)})! +$points points. Current score: $totalScore');
+        'Cleared pile of size $pileSize (combo ×${comboBonus.toStringAsFixed(1)})! +$points points. Current score: ${_scoreNotifier.value}');
     _currentComboCount++;
   }
 
@@ -77,7 +79,7 @@ class ScoringService {
 
   /// Method to reset the score, typically called when starting a new game
   void resetScore() {
-    totalScore = 0;
+    _scoreNotifier.value = 0;
     _currentComboCount = 0;
     _isInComboSession = false;
   }

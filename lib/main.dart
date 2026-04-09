@@ -1,6 +1,7 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/game.dart';
+import 'package:sand_crush/ui/hud_overlay.dart';
 
 void main() {
   runApp(const SandCrush());
@@ -12,9 +13,16 @@ class SandCrush extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Sand Crush',
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: GameWidget(game: SandGame()),
+      home: Scaffold(
+        body: Stack(
+          children: [
+            GameWidget(game: SandGame()),
+            const HudOverlay(),
+          ],
+        ),
+      ),
     );
   }
 }
