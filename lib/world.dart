@@ -60,17 +60,53 @@ class SandWorld {
   // PUBLIC API
   // =========================================================
 
+  /// Checks if a shape can be placed at the given position without overlapping.
+  /// Position will be adjusted to fit within bounds. Returns true if all cells are empty.
+  bool canPlace(List<Point<int>> offsets, int originX, int originY) {
+    if (offsets.isEmpty) return false;
+
+    int minX = 0, maxX = 0, minY = 0, maxY = 0;
+    for (final o in offsets) {
+      if (o.x < minX) minX = o.x;
+      if (o.x > maxX) maxX = o.x;
+      if (o.y < minY) minY = o.y;
+      if (o.y > maxY) maxY = o.y;
+    }
+
+    final adjustedX = originX.clamp(-minX, cols - 1 - maxX);
+    final adjustedY = originY.clamp(-minY, rows - 1 - maxY);
+
+    // Check if all cells are empty
+    for (final o in offsets) {
+      final x = adjustedX + o.x;
+      final y = adjustedY + o.y;
+
+      if (!isInside(x, y)) return false;
+      if (cellIdMap[y * cols + x] != 0) return false; // Cell already occupied
+    }
+
+    return true;
+  }
+
+  /// Checks if a single cell can be placed at the given position.
+  bool canPlaceCell(int x, int y) {
+    if (!isInside(x, y)) return false;
+    return cellIdMap[y * cols + x] == 0;
+  }
+
   void placeCell(int x, int y, Color color) {
+    if (!canPlaceCell(x, y)) return;
     _createCluster([Cell(x, y, color)]);
   }
 
-  void placeShape(
+  /// Attempts to place a shape. Returns true if successful, false otherwise.
+  bool placeShape(
     List<Point<int>> offsets,
     int originX,
     int originY,
     Color color,
   ) {
-    if (offsets.isEmpty) return;
+    if (!canPlace(offsets, originX, originY)) return false;
 
     int minX = 0, maxX = 0, minY = 0, maxY = 0;
     for (final o in offsets) {
@@ -88,6 +124,7 @@ class SandWorld {
     }).toList();
 
     _createCluster(cells);
+    return true;
   }
 
   void update(double dt) {
@@ -103,7 +140,7 @@ class SandWorld {
     final clustersByColor = <int, List<Cluster>>{};
     for (final cluster in clusters.values) {
       if (cluster.cells.length != 1) continue;
-      final colorVal = cluster.cells.first.color.value;
+      final colorVal = cluster.cells.first.color.toARGB32();
       clustersByColor.putIfAbsent(colorVal, () => []).add(cluster);
     }
 
@@ -131,8 +168,8 @@ class SandWorld {
           final adjCluster = clusters[adjClusterId];
           if (adjCluster == null ||
               adjCluster.cells.length != 1 ||
-              adjCluster.cells.first.color.value !=
-                  cluster.cells.first.color.value) {
+              adjCluster.cells.first.color.toARGB32() !=
+                  cluster.cells.first.color.toARGB32()) {
             continue;
           }
           toMerge.add(adjCluster);
@@ -306,8 +343,9 @@ class SandWorld {
     bool touchesRight = false;
     for (int y = 0; y < rows; y++) {
       if (gridColorBuffer[y * cols] == colorVal) touchesLeft = true;
-      if (gridColorBuffer[y * cols + (cols - 1)] == colorVal)
+      if (gridColorBuffer[y * cols + (cols - 1)] == colorVal) {
         touchesRight = true;
+      }
     }
     if (!touchesLeft || !touchesRight) return false;
 

@@ -169,8 +169,10 @@ class SandGame extends FlameGame with TapCallbacks {
 
     if (!sandWorld.isInside(gridX, gridY)) return;
 
-    sandWorld.placeShape(nextShape, gridX, gridY, nextColor);
-    _generateNextPiece();
+    // Only generate next piece if placement was successful
+    if (sandWorld.placeShape(nextShape, gridX, gridY, nextColor)) {
+      _generateNextPiece();
+    }
   }
 
   List<Point<int>> _randomShape() {
