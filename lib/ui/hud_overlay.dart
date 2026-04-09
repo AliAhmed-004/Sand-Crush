@@ -20,7 +20,7 @@ class _HudOverlayState extends State<HudOverlay>
 
   bool _isAnimatingMilestone = false;
 
-  // 🧠 NEW: store latest score during animation
+  // NEW: store latest score during animation
   int? _pendingScore;
 
   @override
@@ -60,19 +60,19 @@ class _HudOverlayState extends State<HudOverlay>
     final score = ScoringService.instance.currentScore;
     final newMilestone = MilestoneService.instance.getCurrentMilestone(score);
 
-    // 🚨 If animating, STORE latest score and bail
+    // If animating, STORE latest score and bail
     if (_isAnimatingMilestone) {
       _pendingScore = score;
       return;
     }
 
-    // 🚨 Milestone crossed
+    // Milestone crossed
     if (newMilestone > _lastMilestone) {
       _handleMilestoneCross(score, newMilestone);
       return;
     }
 
-    // ✅ Normal progress update
+    // Normal progress update
     final progress =
         ((score - _milestoneStart) / (_milestoneEnd - _milestoneStart)).clamp(
           0.0,
@@ -117,7 +117,7 @@ class _HudOverlayState extends State<HudOverlay>
 
     _isAnimatingMilestone = false;
 
-    // 🧠 Process any score updates that happened during animation
+    // Process any score updates that happened during animation
     if (_pendingScore != null) {
       _pendingScore = null;
       _onScoreChanged(); // re-sync with latest state
@@ -144,13 +144,13 @@ class _HudOverlayState extends State<HudOverlay>
     final score = ScoringService.instance.currentScore;
 
     return Positioned(
-      top: 20,
+      top: 40,
       left: 20,
       right: 20,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🧮 Score
+          // Score
           Text(
             'Score: $score',
             style: const TextStyle(
@@ -162,7 +162,7 @@ class _HudOverlayState extends State<HudOverlay>
 
           const SizedBox(height: 12),
 
-          // 📊 Progress Bar
+          // Progress Bar
           AnimatedBuilder(
             animation: _progressController,
             builder: (context, child) {
