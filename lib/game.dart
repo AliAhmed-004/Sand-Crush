@@ -7,6 +7,8 @@ import 'package:flame/events.dart';
 import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:sand_crush/services/difficulty_service.dart';
+import 'package:sand_crush/services/scoring_service.dart';
 import 'package:sand_crush/world.dart';
 
 class SandGame extends FlameGame with TapCallbacks {
@@ -21,6 +23,7 @@ class SandGame extends FlameGame with TapCallbacks {
   final int cols = 80;
   final int rows = 80;
 
+  // All colors available at max difficulty
   static final List<Color> colors = [
     Colors.red,
     Colors.orange,
@@ -91,7 +94,10 @@ class SandGame extends FlameGame with TapCallbacks {
 
   void _generateNextPiece() {
     nextShape = _randomShape();
-    nextColor = colors[Random().nextInt(colors.length)];
+    // Get available colors based on current difficulty
+    final currentScore = ScoringService.instance.currentScore;
+    final availableColors = DifficultyService.instance.getAvailableColors(currentScore);
+    nextColor = availableColors[Random().nextInt(availableColors.length)];
   }
 
   @override
@@ -220,7 +226,11 @@ class SandGame extends FlameGame with TapCallbacks {
       // Merge adjacent same-color clusters to reduce fragmentation
       sandWorld.mergeAdjacentClusters();
 
-      for (final c in colors) {
+      // Get available colors based on current difficulty
+      final currentScore = ScoringService.instance.currentScore;
+      final availableColors = DifficultyService.instance.getAvailableColors(currentScore);
+      
+      for (final c in availableColors) {
         if (sandWorld.clearSpanningBridge(c)) {
           // print('🚀 $c has formed a left-to-right bridge!');
         }
