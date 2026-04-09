@@ -20,6 +20,9 @@ class _HudOverlayState extends State<HudOverlay>
 
   bool _isAnimatingMilestone = false;
 
+  // 🧠 NEW: store latest score during animation
+  int? _pendingScore;
+
   @override
   void initState() {
     super.initState();
@@ -57,13 +60,19 @@ class _HudOverlayState extends State<HudOverlay>
     final score = ScoringService.instance.currentScore;
     final newMilestone = MilestoneService.instance.getCurrentMilestone(score);
 
-    // 🚨 MILESTONE CROSSED
-    if (newMilestone > _lastMilestone && !_isAnimatingMilestone) {
+    // 🚨 If animating, STORE latest score and bail
+    if (_isAnimatingMilestone) {
+      _pendingScore = score;
+      return;
+    }
+
+    // 🚨 Milestone crossed
+    if (newMilestone > _lastMilestone) {
       _handleMilestoneCross(score, newMilestone);
       return;
     }
 
-    // ✅ NORMAL PROGRESS UPDATE
+    // ✅ Normal progress update
     final progress =
         ((score - _milestoneStart) / (_milestoneEnd - _milestoneStart)).clamp(
           0.0,
@@ -81,7 +90,7 @@ class _HudOverlayState extends State<HudOverlay>
     // STEP 1: Fill to 100%
     await _animateTo(1.0, from: currentProgress);
 
-    // Optional micro pause (feels better)
+    // Tiny pause for visual satisfaction
     await Future.delayed(const Duration(milliseconds: 120));
 
     // STEP 2: Reset instantly
@@ -95,7 +104,7 @@ class _HudOverlayState extends State<HudOverlay>
     );
     _milestoneEnd = MilestoneService.instance.getNextMilestoneScore(score);
 
-    setState(() {}); // reflect reset
+    setState(() {});
 
     // STEP 3: Animate overflow progress
     final overflowProgress =
@@ -107,6 +116,12 @@ class _HudOverlayState extends State<HudOverlay>
     await _animateTo(overflowProgress, from: 0.0);
 
     _isAnimatingMilestone = false;
+
+    // 🧠 Process any score updates that happened during animation
+    if (_pendingScore != null) {
+      _pendingScore = null;
+      _onScoreChanged(); // re-sync with latest state
+    }
   }
 
   Future<void> _animateTo(double target, {double? from}) async {
@@ -147,7 +162,7 @@ class _HudOverlayState extends State<HudOverlay>
 
           const SizedBox(height: 12),
 
-          // 📊 Progress
+          // 📊 Progress Bar
           AnimatedBuilder(
             animation: _progressController,
             builder: (context, child) {
