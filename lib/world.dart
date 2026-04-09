@@ -2,6 +2,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:sand_crush/services/scoring_service.dart';
+
 /// -----------------------------
 /// CELL MODEL
 /// -----------------------------
@@ -108,6 +110,10 @@ class SandWorld {
   ) {
     if (!canPlace(offsets, originX, originY)) return false;
 
+    // add placement points for each cell placed
+    ScoringService.instance.addBlockPlacementPoints();
+    
+    // Adjust position to fit within bounds
     int minX = 0, maxX = 0, minY = 0, maxY = 0;
     for (final o in offsets) {
       if (o.x < minX) minX = o.x;
@@ -116,9 +122,11 @@ class SandWorld {
       if (o.y > maxY) maxY = o.y;
     }
 
+    // Clamp origin to ensure shape fits within bounds
     final adjustedX = originX.clamp(-minX, cols - 1 - maxX);
     final adjustedY = originY.clamp(-minY, rows - 1 - maxY);
 
+    // Create cells for the shape
     final cells = offsets.map((o) {
       return Cell(adjustedX + o.x, adjustedY + o.y, color);
     }).toList();
@@ -403,6 +411,8 @@ class SandWorld {
     final colorVal = color.toARGB32();
     bool touchesLeft = false;
     bool touchesRight = false;
+
+    // First check if the color even touches both sides to avoid unnecessary BFS
     for (int y = 0; y < rows; y++) {
       if (gridColorBuffer[y * cols] == colorVal) touchesLeft = true;
       if (gridColorBuffer[y * cols + (cols - 1)] == colorVal) {
@@ -411,10 +421,12 @@ class SandWorld {
     }
     if (!touchesLeft || !touchesRight) return false;
 
+    // BFS to find all connected cells of the color starting from the left edge
     final visited = Uint8List(rows * cols);
     final queue = <int>[];
     final toClear = <int>[];
 
+    // Start BFS from all cells of the target color on the left edge
     for (int y = 0; y < rows; y++) {
       final idx = y * cols;
       if (gridColorBuffer[idx] == colorVal) {
@@ -424,7 +436,9 @@ class SandWorld {
       }
     }
 
+    // Track if we reach the right edge during BFS
     bool reachesRight = false;
+
     // 8-directional neighbors to ensure we clear diagonally connected bridges as well
     final neighbors = [
       1,
@@ -437,12 +451,16 @@ class SandWorld {
       -cols - 1,
     ];
 
+
     int head = 0;
+    
+    // Standard BFS loop
     while (head < queue.length) {
       final currIdx = queue[head++];
       final cx = currIdx % cols;
       if (cx == cols - 1) reachesRight = true;
 
+      // Explore all 8 neighbors
       for (final offset in neighbors) {
         final nextIdx = currIdx + offset;
         if (nextIdx < 0 || nextIdx >= rows * cols) continue;
@@ -462,6 +480,10 @@ class SandWorld {
 
     if (!reachesRight) return false;
 
+    // Award points for clearing the bridge
+    ScoringService.instance.addSandClearPoints(1, toClear.length);
+
+    // Clear the identified bridge cells
     for (final idx in toClear) {
       gridColorBuffer[idx] = 0;
       cellIdMap[idx] = 0;
@@ -471,6 +493,8 @@ class SandWorld {
     return true;
   }
 
+  /// After clearing cells directly in the grid, some clusters may have lost all their cells or become invalid.
+  /// This method scans through existing clusters and removes any that no longer have valid cells in the grid.
   void _cleanupStaleClusters() {
     final idsToRemove = <int>[];
     for (final entry in clusters.entries) {
