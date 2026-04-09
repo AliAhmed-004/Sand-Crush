@@ -16,12 +16,13 @@ class SandGame extends FlameGame with TapCallbacks {
 
   final double topUIRatio = 0.2;
   final double bottomUIRatio = 0.2;
+  final double horizontalPadding = 20.0;
 
   double cellSize = 1;
   late Offset gridOffset;
 
   final int cols = 80;
-  final int rows = 80;
+  final int rows = 100;
 
   // All colors available at max difficulty
   static final List<Color> colors = [
@@ -108,7 +109,7 @@ class SandGame extends FlameGame with TapCallbacks {
     final bottomUIHeight = size.y * bottomUIRatio;
 
     final playableHeight = size.y - topUIHeight - bottomUIHeight;
-    final playableWidth = size.x;
+    final playableWidth = size.x - 2 * horizontalPadding;
 
     final cellWidth = playableWidth / cols;
     final cellHeight = playableHeight / rows;
@@ -119,7 +120,7 @@ class SandGame extends FlameGame with TapCallbacks {
     final gridHeight = rows * cellSize;
 
     gridOffset = Offset(
-      (size.x - gridWidth) / 2,
+      horizontalPadding + (playableWidth - gridWidth) / 2,
       topUIHeight + (playableHeight - gridHeight) / 2,
     );
 
