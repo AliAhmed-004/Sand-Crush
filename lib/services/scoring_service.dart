@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 /// - Combo multiplier: +10% for each additional pile cleared in one move (1.1x, 1.2x, 1.3x, etc.)
 class ScoringService {
   // Base points awarded for placing a block or clearing a pile of sand
-  final int _basePoints = 10;
+  final int _basePoints = 25;
 
   // Total score notifier
   final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
@@ -23,15 +23,14 @@ class ScoringService {
 
   // Singleton pattern
   static final ScoringService _instance = ScoringService._internal();
-  
+
   factory ScoringService() {
     return _instance;
   }
-  
-  ScoringService._internal();
-  
-  static ScoringService get instance => _instance;
 
+  ScoringService._internal();
+
+  static ScoringService get instance => _instance;
 
   /// Method to add points for placing a block
   void addBlockPlacementPoints() {
@@ -60,7 +59,8 @@ class ScoringService {
     _scoreNotifier.value += points;
 
     print(
-        'Cleared pile of size $pileSize (combo ×${comboBonus.toStringAsFixed(1)})! +$points points. Current score: ${_scoreNotifier.value}');
+      'Cleared pile of size $pileSize (combo ×${comboBonus.toStringAsFixed(1)})! +$points points. Current score: ${_scoreNotifier.value}',
+    );
     _currentComboCount++;
   }
 
