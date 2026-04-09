@@ -1,19 +1,23 @@
+import 'dart:math';
+
 /// A service to manage the scoring system of the game.
 ///
-/// Each placement of a block rewards base_points
-/// Each cleared pile of sand rewards base_points * multiplier
-/// The multiplier is based on the size of the pile cleared, minimum is 2
+/// Scoring breakdown:
+/// - Block placement: base_points (10 points)
+/// - Pile clearing: base_points * sqrt(pileSize)
+/// - Combo multiplier: +10% for each additional pile cleared in one move (1.1x, 1.2x, 1.3x, etc.)
 class ScoringService {
   // Base points awarded for placing a block or clearing a pile of sand
-  final int _basePoints = 25;
-  final int _pileMultiplier = 2;
-  final int _comboMultiplier = 1;
+  final int _basePoints = 10;
 
   // Total score of the player
   int totalScore = 0;
 
+  // Combo tracking for pile clears
+  int _currentComboCount = 0;
+  bool _isInComboSession = false;
+
   int get currentScore => totalScore;
-  int get comboMultiplier => _comboMultiplier;
 
   // Singleton pattern
   static final ScoringService _instance = ScoringService._internal();
@@ -30,29 +34,51 @@ class ScoringService {
   /// Method to add points for placing a block
   void addBlockPlacementPoints() {
     totalScore += _basePoints;
-
     print('Block placed! Current score: $totalScore');
   }
 
-  /// Method to add points for clearing a pile of sand
-  void addSandClearPoints(int pilesCleared, int pileSize) {
-    int multiplier = pileSize >= 2 ? pileSize : _pileMultiplier;
-    totalScore += _basePoints * multiplier * pilesCleared;
+  /// Starts a new clear session. Call this when checking for pile clears.
+  void startClearSession() {
+    if (!_isInComboSession) {
+      _currentComboCount = 0;
+      _isInComboSession = true;
+    }
+  }
 
-    print('Cleared $pilesCleared pile(s) of size $pileSize! Current score: $totalScore');
+  /// Method to add points for clearing a pile of sand.
+  /// Uses sqrt(pileSize) for multiplier and applies combo bonus.
+  void addSandClearPoints(int pilesCleared, int pileSize) {
+    // Use square root of pile size as multiplier for more balanced scoring
+    double multiplier = pileSize > 0 ? sqrt(pileSize.toDouble()) : 1.0;
+
+    // Combo bonus: 1.0x for first pile, 1.1x for second, 1.2x for third, etc.
+    double comboBonus = 1.0 + (_currentComboCount * 0.1);
+
+    int points = (_basePoints * multiplier * comboBonus).toInt();
+    totalScore += points;
+
+    print(
+        'Cleared pile of size $pileSize (combo ×${comboBonus.toStringAsFixed(1)})! +$points points. Current score: $totalScore');
+    _currentComboCount++;
+  }
+
+  /// Ends the clear session if no bridges were found.
+  /// Returns true if combo ended, false if combo is still active.
+  bool endClearSessionIfNoBridges(bool anyBridgesCleared) {
+    if (!anyBridgesCleared) {
+      if (_currentComboCount > 1) {
+        print('🔥 Combo! Cleared $_currentComboCount piles in one move!');
+      }
+      _isInComboSession = false;
+      return true; // Combo ended
+    }
+    return false; // Combo continues
   }
 
   /// Method to reset the score, typically called when starting a new game
   void resetScore() {
     totalScore = 0;
-  }
-
-  /// Method to calculate the score for a combo, where multiple piles are cleared in a single move
-  void addComboPoints(int comboCount) {
-    if (comboCount > 1) {
-      totalScore += _basePoints * _comboMultiplier * comboCount;
-
-      print('Combo of $comboCount! Current score: $totalScore');
-    }
+    _currentComboCount = 0;
+    _isInComboSession = false;
   }
 }

@@ -39,7 +39,7 @@ class SandGame extends FlameGame with TapCallbacks {
 
   // Fixed timestep accumulator
   double _accumulator = 0;
-  static const double _step = 1 / 24;
+  static const double _step = 1 / 60;
 
   // Track stability to trigger bridge checks only when the board transitions from unstable to stable
   bool _wasStableLastFrame = true;
@@ -226,15 +226,24 @@ class SandGame extends FlameGame with TapCallbacks {
       // Merge adjacent same-color clusters to reduce fragmentation
       sandWorld.mergeAdjacentClusters();
 
+      // Start a clear session to track combo bonuses
+      ScoringService.instance.startClearSession();
+
       // Get available colors based on current difficulty
       final currentScore = ScoringService.instance.currentScore;
       final availableColors = DifficultyService.instance.getAvailableColors(currentScore);
       
+      bool anyBridgesCleared = false;
       for (final c in availableColors) {
         if (sandWorld.clearSpanningBridge(c)) {
+          anyBridgesCleared = true;
           // print('🚀 $c has formed a left-to-right bridge!');
         }
       }
+
+      // Only end combo if no bridges were found
+      // If bridges were found, the board will be unstable again and combo continues
+      ScoringService.instance.endClearSessionIfNoBridges(anyBridgesCleared);
     }
 
     _wasStableLastFrame = sandWorld.isStable;
