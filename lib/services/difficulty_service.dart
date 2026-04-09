@@ -1,28 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:sand_crush/services/milestone_service.dart';
 
 /// A service to manage the difficulty settings of the game.
 /// 
-/// The difficulty depends on the score
-/// 
-/// Easy: 0-1000 points -> 3 colors of the blocks
-/// Medium: 1000-5000 points -> all colors from previous difficulty + 1 new color
-/// Hard: 5000+ points -> all colors from previous difficulty + 1 new color
+/// The difficulty is now based on milestones. Each milestone is 25,000 points.
+/// Starting with 3 base colors, each milestone unlocks 1 additional color.
 class DifficultyService {
-  // All available colors (ordered by difficulty tier)
-  static const List<Color> _easyColors = [
-    Colors.red,
-    Colors.orange,
-    Colors.yellow,
-  ];
-
-  static const List<Color> _mediumColors = [
-    Colors.red,
-    Colors.orange,
-    Colors.yellow,
-    Colors.green,
-  ];
-
-  static const List<Color> _hardColors = [
+  // All available colors in order (total pool to draw from)
+  static const List<Color> _allColors = [
     Colors.red,
     Colors.orange,
     Colors.yellow,
@@ -31,45 +16,40 @@ class DifficultyService {
     Colors.purple,
   ];
 
+  // Number of colors available at the start
+  static const int _baseColorCount = 3;
+
   // Singleton pattern
   static final DifficultyService _instance = DifficultyService._internal();
-  
+
   factory DifficultyService() {
     return _instance;
   }
-  
+
   DifficultyService._internal();
-  
+
   static DifficultyService get instance => _instance;
 
-  /// Method to get the current difficulty level based on the score
-  DifficultyLevel getDifficultyLevel(int score) {
-    if (score < 1000) {
-      return DifficultyLevel.easy;
-    } else if (score < 5000) {
-      return DifficultyLevel.medium;
-    } else {
-      return DifficultyLevel.hard;
-    }
-  }
-
-  /// Method to get available colors based on the current difficulty level
+  /// Method to get available colors based on the current milestone level.
+  /// Starts with 3 colors and unlocks 1 new color per milestone reached.
   List<Color> getAvailableColors(int score) {
-    final difficulty = getDifficultyLevel(score);
-    switch (difficulty) {
-      case DifficultyLevel.easy:
-        return _easyColors;
-      case DifficultyLevel.medium:
-        return _mediumColors;
-      case DifficultyLevel.hard:
-        return _hardColors;
-    }
-  }
-}
+    final unlockedColorCount = MilestoneService.instance.getUnlockedColorCount(
+      score,
+      _baseColorCount,
+    );
 
-/// Enum to represent the different difficulty levels in a more structured way
-enum DifficultyLevel {
-  easy,
-  medium,
-  hard
+    // Clamp to available colors
+    final colorCount = unlockedColorCount.clamp(0, _allColors.length);
+    return _allColors.sublist(0, colorCount);
+  }
+
+  /// Get the current milestone level
+  int getCurrentMilestone(int score) {
+    return MilestoneService.instance.getCurrentMilestone(score);
+  }
+
+  /// Get the score threshold for the next milestone
+  int getNextMilestoneScore(int score) {
+    return MilestoneService.instance.getNextMilestoneScore(score);
+  }
 }
