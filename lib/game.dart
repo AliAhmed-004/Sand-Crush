@@ -64,8 +64,11 @@ class SandGame extends FlameGame with TapCallbacks {
   double _lastGridLinesOffsetY = -1;
   double _lastGridLinesScale = -1;
 
+  bool isGameStarted = false;
+
   @override
   Future<void> onLoad() async {
+    pauseEngine();
     sandWorld = SandWorld(cols: cols, rows: rows);
     _generateNextPiece();
 

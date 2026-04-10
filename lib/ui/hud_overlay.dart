@@ -147,67 +147,70 @@ class _HudOverlayState extends State<HudOverlay>
       top: 40,
       left: 20,
       right: 20,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Score
-          Text(
-            'Score: $score',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Score
+            Text(
+              'Score: $score',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Progress Bar
-          AnimatedBuilder(
-            animation: _progressController,
-            builder: (context, child) {
-              final progress = _progressAnimation.value;
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Milestone ${_lastMilestone + 1} • Goal: $_milestoneEnd',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.transparent,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Color.lerp(Colors.blue, Colors.purple, progress)!,
+            
+            const SizedBox(height: 12),
+            
+            // Progress Bar
+            AnimatedBuilder(
+              animation: _progressController,
+              builder: (context, child) {
+                final progress = _progressAnimation.value;
+            
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Milestone ${_lastMilestone + 1} • Goal: $_milestoneEnd',
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+            
+                    const SizedBox(height: 8),
+            
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.white12,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        minHeight: 24,
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          backgroundColor: Colors.transparent,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Color.lerp(Colors.blue, Colors.purple, progress)!,
+                          ),
+                          minHeight: 24,
+                        ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Text(
-                    '$_milestoneStart → $_milestoneEnd',
-                    style: const TextStyle(color: Colors.white60, fontSize: 12),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
+            
+                    const SizedBox(height: 8),
+            
+                    Text(
+                      '$_milestoneStart → $_milestoneEnd',
+                      style: const TextStyle(color: Colors.white60, fontSize: 12),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

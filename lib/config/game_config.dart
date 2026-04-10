@@ -1,4 +1,4 @@
 class GameConfig {
-  static final String startScreenOverlayId = 'StartScreenOverlay';
-  static final String gameOverScreenOverlayId = 'GameOverScreenOverlay';
+  static final String mainMenuOverlay = 'MainMenuOverlay';
+  static final String hudOverlay = 'HudOverlay';
 }
