@@ -47,6 +47,13 @@ class SandWorld {
   bool _isStable = true;
   bool get isStable => _isStable;
 
+  bool _isGameOver = false;
+  bool get isGameOver => _isGameOver;
+
+  // Top 10% threshold: if sand reaches this row from the top, game is over
+  late int _gameOverThresholdRow;
+  int get gameOverThresholdRow => _gameOverThresholdRow;
+
   // Performance optimization: cached cluster list
   late List<Cluster> _cachedClusterList;
   int _lastKnownClusterCount = 0;
@@ -56,6 +63,7 @@ class SandWorld {
       cellIdMap = Int32List(cols * rows) {
     _isStable = true;
     _cachedClusterList = [];
+    _gameOverThresholdRow = (rows * 0.1).ceil(); // Top 10% of rows
   }
 
   // =========================================================
@@ -209,6 +217,11 @@ class SandWorld {
     return x >= 0 && x < cols && y >= 0 && y < rows;
   }
 
+  /// Resets the game-over state. Called when starting a new game.
+  void resetGameOverState() {
+    _isGameOver = false;
+  }
+
   // =========================================================
   // CLUSTER CREATION
   // =========================================================
@@ -278,6 +291,26 @@ class SandWorld {
     }
 
     _isStable = !anyMovement;
+
+    // Check for game over condition when board stabilizes
+    if (_isStable) {
+      _checkGameOverCondition();
+    }
+  }
+
+  /// Checks if sand has reached the top threshold (top 10% of grid).
+  /// If so, marks the game as over.
+  void _checkGameOverCondition() {
+    if (_isGameOver) return; // Already game over, no need to check again
+
+    for (int y = 0; y < _gameOverThresholdRow; y++) {
+      for (int x = 0; x < cols; x++) {
+        if (gridColorBuffer[y * cols + x] != 0) {
+          _isGameOver = true;
+          return;
+        }
+      }
+    }
   }
 
   void _breakApartCluster(Cluster cluster) {

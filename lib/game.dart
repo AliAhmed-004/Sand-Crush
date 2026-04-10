@@ -70,6 +70,7 @@ class SandGame extends FlameGame with TapCallbacks {
   int _previousMilestone = 0;
 
   bool isGameStarted = false;
+  bool _isGameOverDetected = false;
 
   @override
   Future<void> onLoad() async {
@@ -180,6 +181,7 @@ class SandGame extends FlameGame with TapCallbacks {
   @override
   void onTapDown(TapDownEvent event) {
     if (!sandWorld.isStable) return;
+    if (sandWorld.isGameOver) return;
 
     final pos = event.localPosition;
     final gridX = ((pos.x - gridOffset.dx) / cellSize).floor();
@@ -226,6 +228,16 @@ class SandGame extends FlameGame with TapCallbacks {
   @override
   void update(double dt) {
     super.update(dt);
+
+    // Pause game on game over
+    if (sandWorld.isGameOver) {
+      if (!_isGameOverDetected) {
+        _isGameOverDetected = true;
+        pauseEngine();
+        overlays.add(GameConfig.gameOverOverlay);
+      }
+      return;
+    }
 
     _accumulator += dt;
 
@@ -296,7 +308,21 @@ class SandGame extends FlameGame with TapCallbacks {
     canvas.drawVertices(vertices, BlendMode.src, Paint());
 
     _drawGridLines(canvas);
+    _drawGameOverThreshold(canvas);
     _drawNextPiecePreview(canvas);
+  }
+
+  void _drawGameOverThreshold(Canvas canvas) {
+    final thresholdY = gridOffset.dy + sandWorld.gameOverThresholdRow * cellSize;
+
+    canvas.drawLine(
+      Offset(gridOffset.dx, thresholdY),
+      Offset(gridOffset.dx + cols * cellSize, thresholdY),
+      Paint()
+        ..color = Colors.red.withAlpha(204) // 80% opacity red
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke,
+    );
   }
 
   void _drawGridLines(Canvas canvas) {
@@ -405,5 +431,16 @@ class SandGame extends FlameGame with TapCallbacks {
       );
       canvas.drawRect(rect, paint);
     }
+  }
+
+  /// Resets game state for a new game. Clears the board and resets all game flags.
+  void resetGameState() {
+    sandWorld = SandWorld(cols: cols, rows: rows);
+    _generateNextPiece();
+    _isGameOverDetected = false;
+    _previousMilestone = 0;
+    _wasStableLastFrame = true;
+    _accumulator = 0;
+    _updateVertexPositions();
   }
 }

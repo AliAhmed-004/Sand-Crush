@@ -4,6 +4,7 @@ import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
 import 'package:sand_crush/theme/theme.dart';
 import 'package:sand_crush/ui/celebration_overlay.dart';
+import 'package:sand_crush/ui/game_over_overlay.dart';
 import 'package:sand_crush/ui/hud_overlay.dart';
 import 'package:sand_crush/ui/main_menu_overlay.dart';
 
@@ -30,6 +31,8 @@ class SandCrush extends StatelessWidget {
               HudOverlay(), // Placeholder for HUD overlay
           GameConfig.celebrationOverlay: (context, game) =>
               CelebrationOverlay(game: game as SandGame),
+          GameConfig.gameOverOverlay: (context, game) =>
+              GameOverOverlay(game: game as SandGame),
         },
         initialActiveOverlays: [GameConfig.mainMenuOverlay],
       ),
