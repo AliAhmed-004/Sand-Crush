@@ -13,7 +13,7 @@ class MainMenuOverlay extends StatelessWidget {
     return Material(
       child: Container(
         padding: const EdgeInsets.all(20),
-        color: Colors.black,
+        color: Theme.of(context).colorScheme.surface,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -23,6 +23,7 @@ class MainMenuOverlay extends StatelessWidget {
                 style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
+              
               ElevatedButton(
                 onPressed: () {
                   game.isGameStarted = true;

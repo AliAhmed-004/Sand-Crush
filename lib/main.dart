@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
+import 'package:sand_crush/theme/theme.dart';
 import 'package:sand_crush/ui/celebration_overlay.dart';
 import 'package:sand_crush/ui/hud_overlay.dart';
 import 'package:sand_crush/ui/main_menu_overlay.dart';
@@ -19,7 +20,7 @@ class SandCrush extends StatelessWidget {
 
     return MaterialApp(
       title: 'Sand Crush',
-      theme: ThemeData(primarySwatch: Colors.blue),
+      theme: theme,
       home: GameWidget.controlled(
         gameFactory: () => game,
         overlayBuilderMap: {
