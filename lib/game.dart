@@ -7,7 +7,9 @@ import 'package:flame/events.dart';
 import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/services/difficulty_service.dart';
+import 'package:sand_crush/services/milestone_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
 import 'package:sand_crush/world.dart';
 
@@ -64,6 +66,9 @@ class SandGame extends FlameGame with TapCallbacks {
   double _lastGridLinesOffsetY = -1;
   double _lastGridLinesScale = -1;
 
+  // Track milestone for celebration overlay
+  int _previousMilestone = 0;
+
   bool isGameStarted = false;
 
   @override
@@ -89,6 +94,9 @@ class SandGame extends FlameGame with TapCallbacks {
       textDirection: TextDirection.ltr,
     );
     _nextTextPainter.layout();
+
+    // Initialize milestone tracking
+    _previousMilestone = MilestoneService.instance.getCurrentMilestone(ScoringService.instance.currentScore);
 
     _isLoaded = true;
 
@@ -226,6 +234,14 @@ class SandGame extends FlameGame with TapCallbacks {
       _accumulator -= _step;
     }
 
+    // Check for milestone changes
+    final currentScore = ScoringService.instance.currentScore;
+    final currentMilestone = MilestoneService.instance.getCurrentMilestone(currentScore);
+    if (currentMilestone > _previousMilestone && isGameStarted) {
+      overlays.add(GameConfig.celebrationOverlay);
+      _previousMilestone = currentMilestone;
+    }
+
     if (sandWorld.isStable && !_wasStableLastFrame) {
       // Merge adjacent same-color clusters to reduce fragmentation
       sandWorld.mergeAdjacentClusters();
@@ -234,7 +250,6 @@ class SandGame extends FlameGame with TapCallbacks {
       ScoringService.instance.startClearSession();
 
       // Get available colors based on current difficulty
-      final currentScore = ScoringService.instance.currentScore;
       final availableColors = DifficultyService.instance.getAvailableColors(currentScore);
       
       bool anyBridgesCleared = false;

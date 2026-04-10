@@ -2,6 +2,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
+import 'package:sand_crush/ui/celebration_overlay.dart';
 import 'package:sand_crush/ui/hud_overlay.dart';
 import 'package:sand_crush/ui/main_menu_overlay.dart';
 
@@ -24,7 +25,10 @@ class SandCrush extends StatelessWidget {
         overlayBuilderMap: {
           GameConfig.mainMenuOverlay: (context, game) =>
               MainMenuOverlay(game: game as SandGame),
-          GameConfig.hudOverlay: (context, game) => HudOverlay(), // Placeholder for HUD overlay
+          GameConfig.hudOverlay: (context, game) =>
+              HudOverlay(), // Placeholder for HUD overlay
+          GameConfig.celebrationOverlay: (context, game) =>
+              CelebrationOverlay(game: game as SandGame),
         },
         initialActiveOverlays: [GameConfig.mainMenuOverlay],
       ),

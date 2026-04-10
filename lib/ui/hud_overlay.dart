@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:sand_crush/services/milestone_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
 
+
+/// HUD overlay for the Sand Crush game, showing score and milestone progress.
+/// 
+/// This overlay listens to score changes and updates the progress bar accordingly.
+/// When a milestone is crossed, it animates the progress bar filling up, resets, and then fills to the overflow amount.
 class HudOverlay extends StatefulWidget {
   const HudOverlay({super.key});
 

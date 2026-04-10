@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
 
+/// Main menu overlay for the Sand Crush game.
 class MainMenuOverlay extends StatelessWidget {
   final SandGame game;
 
@@ -24,6 +25,7 @@ class MainMenuOverlay extends StatelessWidget {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
+                  game.isGameStarted = true;
                   game.resumeEngine();
                   game.overlays.remove(GameConfig.mainMenuOverlay);
                   game.overlays.add(GameConfig.hudOverlay);

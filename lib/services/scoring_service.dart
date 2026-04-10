@@ -12,7 +12,7 @@ class ScoringService {
   final int _basePoints = 25;
 
   // Total score notifier
-  final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
+  final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(24900);
 
   // Combo tracking for pile clears
   int _currentComboCount = 0;
