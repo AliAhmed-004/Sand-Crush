@@ -1,14 +1,19 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
+import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/theme/theme.dart';
 import 'package:sand_crush/ui/celebration_overlay.dart';
 import 'package:sand_crush/ui/game_over_overlay.dart';
 import 'package:sand_crush/ui/hud_overlay.dart';
 import 'package:sand_crush/ui/main_menu_overlay.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await HighScoreService.instance.initialize();
   runApp(const SandCrush());
 }
 

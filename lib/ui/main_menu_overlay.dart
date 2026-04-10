@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
+import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
 
 /// Main menu overlay for the Sand Crush game.
@@ -11,6 +12,8 @@ class MainMenuOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final highScore = HighScoreService.instance.getHighScore();
+
     return Material(
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -23,8 +26,16 @@ class MainMenuOverlay extends StatelessWidget {
                 'Sand Crush',
                 style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 20),
-              
+              const SizedBox(height: 30),
+              Text(
+                'High Score: $highScore',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                ),
+              ),
+              const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () {
                   game.resetGameState();

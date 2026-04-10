@@ -9,6 +9,7 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/services/difficulty_service.dart';
+import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/services/milestone_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
 import 'package:sand_crush/world.dart';
@@ -233,6 +234,10 @@ class SandGame extends FlameGame with TapCallbacks {
     if (sandWorld.isGameOver) {
       if (!_isGameOverDetected) {
         _isGameOverDetected = true;
+        // Save high score if current score is higher
+        HighScoreService.instance.saveHighScoreIfHigher(
+          ScoringService.instance.currentScore,
+        );
         pauseEngine();
         overlays.add(GameConfig.gameOverOverlay);
       }
