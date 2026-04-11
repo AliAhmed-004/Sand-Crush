@@ -19,6 +19,10 @@ class DifficultyService {
   // Number of colors available at the start
   static const int _baseColorCount = 3;
 
+  // Cache for available color lists to avoid repeated allocations
+  // Keyed by colorCount (0-6), since sublist is deterministic by count
+  static final Map<int, List<Color>> _colorCache = _buildColorCache();
+
   // Singleton pattern
   static final DifficultyService _instance = DifficultyService._internal();
 
@@ -30,17 +34,27 @@ class DifficultyService {
 
   static DifficultyService get instance => _instance;
 
+  /// Pre-build color cache to avoid repeated sublist allocations
+  static Map<int, List<Color>> _buildColorCache() {
+    final cache = <int, List<Color>>{};
+    for (int i = 0; i <= _allColors.length; i++) {
+      cache[i] = List<Color>.unmodifiable(_allColors.sublist(0, i));
+    }
+    return cache;
+  }
+
   /// Method to get available colors based on the current milestone level.
   /// Starts with 3 colors and unlocks 1 new color per milestone reached.
+  /// Uses cached lists to avoid repeated allocations.
   List<Color> getAvailableColors(int score) {
     final unlockedColorCount = MilestoneService.instance.getUnlockedColorCount(
       score,
       _baseColorCount,
     );
 
-    // Clamp to available colors
+    // Clamp to available colors and return from cache
     final colorCount = unlockedColorCount.clamp(0, _allColors.length);
-    return _allColors.sublist(0, colorCount);
+    return _colorCache[colorCount] ?? const [];
   }
 
   /// Get the current milestone level

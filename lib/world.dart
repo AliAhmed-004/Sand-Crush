@@ -65,12 +65,18 @@ class SandWorld {
   // Used to efficiently clear only the cells that changed
   late Set<int> _previousFrameCellIndices;
 
+  // Bridge detection optimization: cache which colors touch edges
+  late Set<int> _leftEdgeColors;
+  late Set<int> _rightEdgeColors;
+
   SandWorld({required this.cols, required this.rows})
     : gridColorBuffer = Uint32List(cols * rows),
       cellIdMap = Int32List(cols * rows) {
     _isStable = true;
     _cachedClusterList = [];
     _previousFrameCellIndices = <int>{};
+    _leftEdgeColors = <int>{};
+    _rightEdgeColors = <int>{};
     _gameOverThresholdRow = (rows * 0.1).ceil(); // Top 10% of rows
   }
 
@@ -379,16 +385,27 @@ class SandWorld {
       gridColorBuffer[cellIndex] = 0;
     }
 
-    // Collect current frame cell indices
+    // Collect current frame cell indices and edge colors for bridge detection optimization
     final currentFrameCellIndices = <int>{};
+    _leftEdgeColors.clear();
+    _rightEdgeColors.clear();
 
     // Update grid with current cluster cells
     for (final cluster in clusters.values) {
       for (final cell in cluster.cells) {
         if (isInside(cell.x, cell.y)) {
           final cellIndex = cell.y * cols + cell.x;
-          gridColorBuffer[cellIndex] = cell.color.value;
+          final colorVal = cell.color.toARGB32();
+          gridColorBuffer[cellIndex] = colorVal;
           currentFrameCellIndices.add(cellIndex);
+
+          // Track which colors touch the edges for bridge detection optimization
+          if (cell.x == 0) {
+            _leftEdgeColors.add(colorVal);
+          }
+          if (cell.x == cols - 1) {
+            _rightEdgeColors.add(colorVal);
+          }
         }
       }
     }
@@ -463,17 +480,12 @@ class SandWorld {
     if (!_isStable) return false;
 
     final colorVal = color.toARGB32();
-    bool touchesLeft = false;
-    bool touchesRight = false;
-
-    // First check if the color even touches both sides to avoid unnecessary BFS
-    for (int y = 0; y < rows; y++) {
-      if (gridColorBuffer[y * cols] == colorVal) touchesLeft = true;
-      if (gridColorBuffer[y * cols + (cols - 1)] == colorVal) {
-        touchesRight = true;
-      }
+    
+    // Quick reject: use cached edge color info instead of scanning edges
+    // This saves O(rows * 2) operations per color check
+    if (!_leftEdgeColors.contains(colorVal) || !_rightEdgeColors.contains(colorVal)) {
+      return false;
     }
-    if (!touchesLeft || !touchesRight) return false;
 
     // BFS to find all connected cells of the color starting from the left edge
     final visited = Uint8List(rows * cols);
@@ -590,8 +602,10 @@ class SandWorld {
 
   // Rebuild cluster from saved game
   void rebuildClusters(SandWorld world) {
-    // Clear dirty tracking to get fresh state after rebuild
+    // Clear dirty tracking and edge colors to get fresh state after rebuild
     world._previousFrameCellIndices.clear();
+    world._leftEdgeColors.clear();
+    world._rightEdgeColors.clear();
     
     final visited = <int>{};
     final cols = world.cols;
