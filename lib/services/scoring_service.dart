@@ -35,7 +35,6 @@ class ScoringService {
   /// Method to add points for placing a block
   void addBlockPlacementPoints() {
     _scoreNotifier.value += _basePoints;
-    print('Block placed! Current score: ${_scoreNotifier.value}');
   }
 
   /// Starts a new clear session. Call this when checking for pile clears.

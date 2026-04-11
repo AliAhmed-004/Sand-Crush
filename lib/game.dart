@@ -50,6 +50,10 @@ class SandGame extends FlameGame with TapCallbacks {
   // Track stability to trigger bridge checks only when the board transitions from unstable to stable
   bool _wasStableLastFrame = true;
 
+  // Debounced save frequency: save game state only after every N successful placements
+  static const int _saveInterval = 5;
+  int _placementsSinceLastSave = 0;
+
   // Next piece preview
   late List<Point<int>> nextShape;
   late Color nextColor;
@@ -192,22 +196,21 @@ class SandGame extends FlameGame with TapCallbacks {
 
     if (!sandWorld.isInside(gridX, gridY)) return;
 
-    // Save game state before placing shape
-    final gameStateDTO = GameStateDTO(
-      cols: sandWorld.cols,
-      rows: sandWorld.rows,
-      grid: sandWorld.gridColorBuffer.toList(),
-    );
-    print('Saving game state: cols=${gameStateDTO.cols}, rows=${gameStateDTO.rows}, gridLength=${gameStateDTO.grid.length}');
-    SaveGameService.instance.saveGame(gameStateDTO, ScoringService.instance.currentScore).then((_) {
-      print('Game state saved successfully');
-    }).catchError((e) {
-      print('Error saving game state: $e');
-    });
-
     // Only generate next piece if placement was successful
     if (sandWorld.placeShape(nextShape, gridX, gridY, nextColor)) {
       _generateNextPiece();
+      
+      // Debounced save: only save every N placements
+      _placementsSinceLastSave++;
+      if (_placementsSinceLastSave >= _saveInterval) {
+        final gameStateDTO = GameStateDTO(
+          cols: sandWorld.cols,
+          rows: sandWorld.rows,
+          grid: sandWorld.gridColorBuffer.toList(),
+        );
+        SaveGameService.instance.saveGame(gameStateDTO, ScoringService.instance.currentScore);
+        _placementsSinceLastSave = 0;
+      }
     }
   }
 
@@ -461,6 +464,7 @@ class SandGame extends FlameGame with TapCallbacks {
     _previousMilestone = 0;
     _wasStableLastFrame = true;
     _accumulator = 0;
+    _placementsSinceLastSave = 0;
     _updateVertexPositions();
   }
 
@@ -469,10 +473,7 @@ class SandGame extends FlameGame with TapCallbacks {
     final saveService = SaveGameService.instance;
     final savedData = saveService.loadGame();
 
-    print('Loading saved game... Data: $savedData');
-
     if (savedData == null) {
-      print('No saved game data found');
       return;
     }
 
@@ -483,8 +484,6 @@ class SandGame extends FlameGame with TapCallbacks {
       final gridList = savedData['grid'] as List;
       final gridData = List<int>.from(gridList);
       final score = savedData['score'] as int;
-
-      print('Loading game: cols=$cols, rows=$rows, gridLength=${gridData.length}, score=$score');
 
       // Reset world and restore grid
       sandWorld = SandWorld(cols: cols, rows: rows);
@@ -502,12 +501,10 @@ class SandGame extends FlameGame with TapCallbacks {
       _previousMilestone = 0;
       _wasStableLastFrame = true;
       _accumulator = 0;
+      _placementsSinceLastSave = 0;
       _updateVertexPositions();
-
-      print('Game loaded successfully');
-    } catch (e, stackTrace) {
-      print('Error loading saved game: $e');
-      print(stackTrace);
+    } catch (e) {
+      // Silently fail if load is corrupted
     }
   }
 }

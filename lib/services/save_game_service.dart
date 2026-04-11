@@ -57,7 +57,6 @@ class SaveGameService {
     try {
       return (data as Map)['score'] as int?;
     } catch (e) {
-      print('Error getting saved score: $e');
       return null;
     }
   }
