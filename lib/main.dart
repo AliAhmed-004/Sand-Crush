@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
 import 'package:sand_crush/services/high_score_service.dart';
+import 'package:sand_crush/services/save_game_service.dart';
 import 'package:sand_crush/theme/theme.dart';
 import 'package:sand_crush/ui/celebration_overlay.dart';
 import 'package:sand_crush/ui/game_over_overlay.dart';
@@ -14,6 +15,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   await HighScoreService.instance.initialize();
+  await SaveGameService.instance.initialize();
   runApp(const SandCrush());
 }
 

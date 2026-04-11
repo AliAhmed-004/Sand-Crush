@@ -8,9 +8,11 @@ import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
+import 'package:sand_crush/models/game_state_dto.dart';
 import 'package:sand_crush/services/difficulty_service.dart';
 import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/services/milestone_service.dart';
+import 'package:sand_crush/services/save_game_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
 import 'package:sand_crush/world.dart';
 
@@ -189,6 +191,19 @@ class SandGame extends FlameGame with TapCallbacks {
     final gridY = ((pos.y - gridOffset.dy) / cellSize).floor();
 
     if (!sandWorld.isInside(gridX, gridY)) return;
+
+    // Save game state before placing shape
+    final gameStateDTO = GameStateDTO(
+      cols: sandWorld.cols,
+      rows: sandWorld.rows,
+      grid: sandWorld.gridColorBuffer.toList(),
+    );
+    print('Saving game state: cols=${gameStateDTO.cols}, rows=${gameStateDTO.rows}, gridLength=${gameStateDTO.grid.length}');
+    SaveGameService.instance.saveGame(gameStateDTO, ScoringService.instance.currentScore).then((_) {
+      print('Game state saved successfully');
+    }).catchError((e) {
+      print('Error saving game state: $e');
+    });
 
     // Only generate next piece if placement was successful
     if (sandWorld.placeShape(nextShape, gridX, gridY, nextColor)) {
@@ -447,5 +462,52 @@ class SandGame extends FlameGame with TapCallbacks {
     _wasStableLastFrame = true;
     _accumulator = 0;
     _updateVertexPositions();
+  }
+
+  /// Loads a saved game state and rebuilds the world from the saved grid.
+  void loadSavedGame() {
+    final saveService = SaveGameService.instance;
+    final savedData = saveService.loadGame();
+
+    print('Loading saved game... Data: $savedData');
+
+    if (savedData == null) {
+      print('No saved game data found');
+      return;
+    }
+
+    try {
+      // Restore the grid data
+      final cols = savedData['cols'] as int;
+      final rows = savedData['rows'] as int;
+      final gridList = savedData['grid'] as List;
+      final gridData = List<int>.from(gridList);
+      final score = savedData['score'] as int;
+
+      print('Loading game: cols=$cols, rows=$rows, gridLength=${gridData.length}, score=$score');
+
+      // Reset world and restore grid
+      sandWorld = SandWorld(cols: cols, rows: rows);
+      sandWorld.gridColorBuffer.setAll(0, gridData);
+
+      // Rebuild clusters from the restored grid
+      sandWorld.rebuildClusters(sandWorld);
+
+      // Restore score
+      ScoringService.instance.setScore(score);
+
+      // Generate next piece and reset flags
+      _generateNextPiece();
+      _isGameOverDetected = false;
+      _previousMilestone = 0;
+      _wasStableLastFrame = true;
+      _accumulator = 0;
+      _updateVertexPositions();
+
+      print('Game loaded successfully');
+    } catch (e, stackTrace) {
+      print('Error loading saved game: $e');
+      print(stackTrace);
+    }
   }
 }

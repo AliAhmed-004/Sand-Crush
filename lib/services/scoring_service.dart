@@ -83,4 +83,11 @@ class ScoringService {
     _currentComboCount = 0;
     _isInComboSession = false;
   }
+
+  /// Method to set the score, typically called when loading a saved game
+  void setScore(int score) {
+    _scoreNotifier.value = score;
+    _currentComboCount = 0;
+    _isInComboSession = false;
+  }
 }

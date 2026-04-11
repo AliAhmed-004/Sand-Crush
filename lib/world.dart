@@ -120,7 +120,7 @@ class SandWorld {
 
     // add placement points for each cell placed
     ScoringService.instance.addBlockPlacementPoints();
-    
+
     // Adjust position to fit within bounds
     int minX = 0, maxX = 0, minY = 0, maxY = 0;
     for (final o in offsets) {
@@ -484,9 +484,8 @@ class SandWorld {
       -cols - 1,
     ];
 
-
     int head = 0;
-    
+
     // Standard BFS loop
     while (head < queue.length) {
       final currIdx = queue[head++];
@@ -566,5 +565,43 @@ class SandWorld {
       return false;
     }
     return true;
+  }
+
+  // Rebuild cluster from saved game
+  void rebuildClusters(SandWorld world) {
+    final visited = <int>{};
+    final cols = world.cols;
+    final rows = world.rows;
+
+    for (int i = 0; i < world.gridColorBuffer.length; i++) {
+      if (world.gridColorBuffer[i] == 0 || visited.contains(i)) continue;
+
+      final color = world.gridColorBuffer[i];
+      final queue = [i];
+      final cells = <Cell>[];
+
+      visited.add(i);
+
+      while (queue.isNotEmpty) {
+        final idx = queue.removeLast();
+        final x = idx % cols;
+        final y = idx ~/ cols;
+
+        cells.add(Cell(x, y, Color(color)));
+
+        final neighbors = [idx + 1, idx - 1, idx + cols, idx - cols];
+
+        for (final n in neighbors) {
+          if (n < 0 || n >= cols * rows) continue;
+          if (visited.contains(n)) continue;
+          if (world.gridColorBuffer[n] != color) continue;
+
+          visited.add(n);
+          queue.add(n);
+        }
+      }
+
+      world._createCluster(cells);
+    }
   }
 }
