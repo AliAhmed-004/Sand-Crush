@@ -42,6 +42,9 @@ class SandWorld {
   /// Value of 0 means empty.
   final Int32List cellIdMap;
 
+  // Singleton Random instance to avoid allocations in physics loop
+  static final Random _random = Random();
+
   int _nextClusterId = 1;
 
   bool _isStable = true;
@@ -58,11 +61,16 @@ class SandWorld {
   late List<Cluster> _cachedClusterList;
   int _lastKnownClusterCount = 0;
 
+  // Dirty region tracking: stores cell indices that were occupied last frame
+  // Used to efficiently clear only the cells that changed
+  late Set<int> _previousFrameCellIndices;
+
   SandWorld({required this.cols, required this.rows})
     : gridColorBuffer = Uint32List(cols * rows),
       cellIdMap = Int32List(cols * rows) {
     _isStable = true;
     _cachedClusterList = [];
+    _previousFrameCellIndices = <int>{};
     _gameOverThresholdRow = (rows * 0.1).ceil(); // Top 10% of rows
   }
 
@@ -258,7 +266,7 @@ class SandWorld {
         continue;
       }
 
-      final leftFirst = Random().nextBool();
+      final leftFirst = _random.nextBool();
       bool moved = false;
 
       if (leftFirst) {
@@ -365,15 +373,28 @@ class SandWorld {
   // =========================================================
 
   void _syncGridFromClusters() {
-    gridColorBuffer.fillRange(0, gridColorBuffer.length, 0); // Fast full clear
+    // Cell-level dirty tracking: clear only cells that were occupied in previous frame
+    // This is much more efficient than clearing the entire 8000-cell buffer every frame
+    for (final cellIndex in _previousFrameCellIndices) {
+      gridColorBuffer[cellIndex] = 0;
+    }
 
+    // Collect current frame cell indices
+    final currentFrameCellIndices = <int>{};
+
+    // Update grid with current cluster cells
     for (final cluster in clusters.values) {
       for (final cell in cluster.cells) {
         if (isInside(cell.x, cell.y)) {
-          gridColorBuffer[cell.y * cols + cell.x] = cell.color.value;
+          final cellIndex = cell.y * cols + cell.x;
+          gridColorBuffer[cellIndex] = cell.color.value;
+          currentFrameCellIndices.add(cellIndex);
         }
       }
     }
+
+    // Swap tracking set for next frame
+    _previousFrameCellIndices = currentFrameCellIndices;
   }
 
   bool doesColorSpanLeftToRight(Color color) {
@@ -569,6 +590,9 @@ class SandWorld {
 
   // Rebuild cluster from saved game
   void rebuildClusters(SandWorld world) {
+    // Clear dirty tracking to get fresh state after rebuild
+    world._previousFrameCellIndices.clear();
+    
     final visited = <int>{};
     final cols = world.cols;
     final rows = world.rows;

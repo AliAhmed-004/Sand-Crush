@@ -39,6 +39,9 @@ class SandGame extends FlameGame with TapCallbacks {
     Colors.purple,
   ];
 
+  // Singleton Random instance to avoid allocations
+  static final Random _random = Random();
+
   // Batched rendering buffers
   late Float32List _vertices;
   late Int32List _colors;
@@ -117,7 +120,7 @@ class SandGame extends FlameGame with TapCallbacks {
     // Get available colors based on current difficulty
     final currentScore = ScoringService.instance.currentScore;
     final availableColors = DifficultyService.instance.getAvailableColors(currentScore);
-    nextColor = availableColors[Random().nextInt(availableColors.length)];
+    nextColor = availableColors[_random.nextInt(availableColors.length)];
   }
 
   @override
@@ -221,7 +224,7 @@ class SandGame extends FlameGame with TapCallbacks {
       [Point(-1, -1), Point(-1, 0), Point(-1, 1), Point(0, 1)],
     ];
 
-    final baseShape = shapes[Random().nextInt(shapes.length)];
+    final baseShape = shapes[_random.nextInt(shapes.length)];
     int scale = cols ~/ 15;
     if (scale < 1) scale = 1;
 
