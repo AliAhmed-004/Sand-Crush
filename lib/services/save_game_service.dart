@@ -50,6 +50,18 @@ class SaveGameService {
     return _box.containsKey(GameConfig.savedGameStateKey);
   }
 
+  // Method to get the score from the saved game
+  int? getSavedScore() {
+    final data = _box.get(GameConfig.savedGameStateKey);
+    if (data == null) return null;
+    try {
+      return (data as Map)['score'] as int?;
+    } catch (e) {
+      print('Error getting saved score: $e');
+      return null;
+    }
+  }
+
   // Method to delete the saved game
   Future<void> deleteSavedGame() async {
     await _box.delete(GameConfig.savedGameStateKey);

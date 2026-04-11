@@ -15,6 +15,7 @@ class MainMenuOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final highScore = HighScoreService.instance.getHighScore();
     final hasSavedGame = SaveGameService.instance.hasSavedGame();
+    final savedScore = SaveGameService.instance.getSavedScore();
 
     return Material(
       child: Container(
@@ -38,7 +39,7 @@ class MainMenuOverlay extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
-              if (hasSavedGame)
+              if (hasSavedGame) ...[
                 ElevatedButton(
                   onPressed: () {
                     game.loadSavedGame();
@@ -49,7 +50,16 @@ class MainMenuOverlay extends StatelessWidget {
                   },
                   child: const Text('Continue Game'),
                 ),
-              if (hasSavedGame) const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                Text(
+                  'Score: ${savedScore ?? 0}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
               ElevatedButton(
                 onPressed: () {
                   game.resetGameState();
