@@ -3,9 +3,8 @@ import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
 import 'package:sand_crush/theme/theme.dart';
 
-
 /// Pause overlay for the Sand Crush game.
-/// 
+///
 /// Shows options to resume, restart, return to menu, and toggle sound/haptics.
 class PauseOverlay extends StatefulWidget {
   final SandGame game;
@@ -79,11 +78,14 @@ class _PauseOverlayState extends State<PauseOverlay> {
                     onPressed: _resume,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.blue,
+                      backgroundColor: SandColors.warmAccent,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Resume',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -98,9 +100,12 @@ class _PauseOverlayState extends State<PauseOverlay> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: SandColors.warmAccent,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Restart Game',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -113,11 +118,14 @@ class _PauseOverlayState extends State<PauseOverlay> {
                     onPressed: _mainMenu,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.red,
+                      backgroundColor: SandColors.warmAccent,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Main Menu',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -136,7 +144,10 @@ class _PauseOverlayState extends State<PauseOverlay> {
 
                 // Sound Effects Toggle
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: SandColors.sandyBeige.withAlpha(26), // 10% opacity
                     borderRadius: BorderRadius.circular(8),
@@ -147,10 +158,7 @@ class _PauseOverlayState extends State<PauseOverlay> {
                     children: [
                       const Text(
                         'Sound Effects',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
+                        style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
                       Switch(
                         value: _soundEnabled,
@@ -170,7 +178,10 @@ class _PauseOverlayState extends State<PauseOverlay> {
 
                 // Haptic Feedback Toggle
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 12,
+                    horizontal: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: SandColors.sandyBeige.withAlpha(26), // 10% opacity
                     borderRadius: BorderRadius.circular(8),
@@ -181,10 +192,7 @@ class _PauseOverlayState extends State<PauseOverlay> {
                     children: [
                       const Text(
                         'Haptic Feedback',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
+                        style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
                       Switch(
                         value: _hapticEnabled,

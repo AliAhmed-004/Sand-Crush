@@ -21,7 +21,7 @@ class MainMenuOverlay extends StatelessWidget {
     return Material(
       child: Container(
         padding: const EdgeInsets.all(20),
-        color: SandColors.darkBg,
+        color: SandColors.mediumBg,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
