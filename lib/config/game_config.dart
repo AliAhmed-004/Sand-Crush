@@ -1,6 +1,7 @@
 class GameConfig {
   static final String mainMenuOverlay = 'MainMenuOverlay';
   static final String hudOverlay = 'HudOverlay';
+  static final String pauseOverlay = 'PauseOverlay';
   static final String celebrationOverlay = 'CelebrationOverlay';
   static final String gameOverOverlay = 'GameOverOverlay';
 

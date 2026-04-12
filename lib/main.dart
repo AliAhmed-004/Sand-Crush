@@ -10,6 +10,7 @@ import 'package:sand_crush/ui/celebration_overlay.dart';
 import 'package:sand_crush/ui/game_over_overlay.dart';
 import 'package:sand_crush/ui/hud_overlay.dart';
 import 'package:sand_crush/ui/main_menu_overlay.dart';
+import 'package:sand_crush/ui/pause_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +36,9 @@ class SandCrush extends StatelessWidget {
           GameConfig.mainMenuOverlay: (context, game) =>
               MainMenuOverlay(game: game as SandGame),
           GameConfig.hudOverlay: (context, game) =>
-              HudOverlay(), // Placeholder for HUD overlay
+              HudOverlay(game: game as SandGame),
+          GameConfig.pauseOverlay: (context, game) =>
+              PauseOverlay(game: game as SandGame),
           GameConfig.celebrationOverlay: (context, game) =>
               CelebrationOverlay(game: game as SandGame),
           GameConfig.gameOverOverlay: (context, game) =>

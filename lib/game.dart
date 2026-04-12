@@ -576,6 +576,7 @@ class SandGame extends FlameGame with TapCallbacks {
   void resetGameState() {
     sandWorld = SandWorld(cols: cols, rows: rows);
     _generateNextPiece();
+    ScoringService.instance.resetScore();
     _isGameOverDetected = false;
     _previousMilestone = 0;
     _wasStableLastFrame = true;

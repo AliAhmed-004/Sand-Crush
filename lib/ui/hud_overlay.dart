@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:sand_crush/config/game_config.dart';
+import 'package:sand_crush/game.dart';
 import 'package:sand_crush/services/milestone_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
 
 
-/// HUD overlay for the Sand Crush game, showing score and milestone progress.
+/// HUD overlay for the Sand Crush game, showing score, progress, and pause button.
 /// 
-/// This overlay listens to score changes and updates the progress bar accordingly.
-/// When a milestone is crossed, it animates the progress bar filling up, resets, and then fills to the overflow amount.
+/// Horizontal layout: Score (left) • Progress Bar (center) • Pause Button (right)
 class HudOverlay extends StatefulWidget {
-  const HudOverlay({super.key});
+  final SandGame game;
+
+  const HudOverlay({super.key, required this.game});
 
   @override
   State<HudOverlay> createState() => _HudOverlayState();
@@ -24,8 +27,6 @@ class _HudOverlayState extends State<HudOverlay>
   int _milestoneEnd = 25000;
 
   bool _isAnimatingMilestone = false;
-
-  // NEW: store latest score during animation
   int? _pendingScore;
 
   @override
@@ -65,19 +66,16 @@ class _HudOverlayState extends State<HudOverlay>
     final score = ScoringService.instance.currentScore;
     final newMilestone = MilestoneService.instance.getCurrentMilestone(score);
 
-    // If animating, STORE latest score and bail
     if (_isAnimatingMilestone) {
       _pendingScore = score;
       return;
     }
 
-    // Milestone crossed
     if (newMilestone > _lastMilestone) {
       _handleMilestoneCross(score, newMilestone);
       return;
     }
 
-    // Normal progress update
     final progress =
         ((score - _milestoneStart) / (_milestoneEnd - _milestoneStart)).clamp(
           0.0,
@@ -91,18 +89,12 @@ class _HudOverlayState extends State<HudOverlay>
     _isAnimatingMilestone = true;
 
     final currentProgress = _progressAnimation.value;
-
-    // STEP 1: Fill to 100%
     await _animateTo(1.0, from: currentProgress);
-
-    // Tiny pause for visual satisfaction
     await Future.delayed(const Duration(milliseconds: 120));
 
-    // STEP 2: Reset instantly
     _progressController.reset();
     _progressAnimation = AlwaysStoppedAnimation(0.0);
 
-    // Update milestone AFTER fill
     _lastMilestone = newMilestone;
     _milestoneStart = MilestoneService.instance.getMilestoneScore(
       _lastMilestone,
@@ -111,7 +103,6 @@ class _HudOverlayState extends State<HudOverlay>
 
     setState(() {});
 
-    // STEP 3: Animate overflow progress
     final overflowProgress =
         ((score - _milestoneStart) / (_milestoneEnd - _milestoneStart)).clamp(
           0.0,
@@ -122,10 +113,9 @@ class _HudOverlayState extends State<HudOverlay>
 
     _isAnimatingMilestone = false;
 
-    // Process any score updates that happened during animation
     if (_pendingScore != null) {
       _pendingScore = null;
-      _onScoreChanged(); // re-sync with latest state
+      _onScoreChanged();
     }
   }
 
@@ -144,54 +134,65 @@ class _HudOverlayState extends State<HudOverlay>
     await _progressController.forward(from: 0);
   }
 
+  /// Formats score: full number if < 10,000, otherwise K notation
+  String _formatScore(int score) {
+    if (score < 10000) {
+      return score.toString();
+    }
+    final k = score / 1000;
+    return '${k.toStringAsFixed(1)}K';
+  }
+
+  void _togglePause() {
+    widget.game.overlays.add(GameConfig.pauseOverlay);
+  }
+
   @override
   Widget build(BuildContext context) {
     final score = ScoringService.instance.currentScore;
+    final formattedScore = _formatScore(score);
 
     return Positioned(
-      top: 40,
+      top: 20,
       left: 20,
       right: 20,
       child: Material(
         type: MaterialType.transparency,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Score
-            Text(
-              'Score: $score',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.black.withAlpha(102), // 40% opacity
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white12, width: 1),
+          ),
+          child: Row(
+            children: [
+              // Score (left)
+              Text(
+                formattedScore,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Progress Bar
-            AnimatedBuilder(
-              animation: _progressController,
-              builder: (context, child) {
-                final progress = _progressAnimation.value;
-            
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Milestone ${_lastMilestone + 1} • Goal: $_milestoneEnd',
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
-                    ),
-            
-                    const SizedBox(height: 8),
-            
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+
+              const SizedBox(width: 20),
+
+              // Progress Bar (center - flexible)
+              Expanded(
+                child: AnimatedBuilder(
+                  animation: _progressController,
+                  builder: (context, child) {
+                    final progress = _progressAnimation.value;
+
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
                       child: Container(
-                        height: 24,
+                        height: 20,
                         decoration: BoxDecoration(
                           color: Colors.white12,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: LinearProgressIndicator(
                           value: progress,
@@ -199,22 +200,47 @@ class _HudOverlayState extends State<HudOverlay>
                           valueColor: AlwaysStoppedAnimation<Color>(
                             Color.lerp(Colors.blue, Colors.purple, progress)!,
                           ),
-                          minHeight: 24,
+                          minHeight: 20,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 20),
+
+              // Pause Button (right)
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _togglePause,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.white24,
+                          width: 2,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.pause,
+                          color: Colors.white,
+                          size: 20,
                         ),
                       ),
                     ),
-            
-                    const SizedBox(height: 8),
-            
-                    Text(
-                      '$_milestoneStart → $_milestoneEnd',
-                      style: const TextStyle(color: Colors.white60, fontSize: 12),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
