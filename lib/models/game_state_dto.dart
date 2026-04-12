@@ -4,15 +4,22 @@ import 'package:sand_crush/world.dart';
 class GameStateDTO {
   final int cols;
   final int rows;
-  final List<int> grid; // flattened ARGB values
+  final List<int> grid; // flattened ARGB values (display colors)
+  final List<int> baseColorIds; // base color IDs for matching logic
 
-  GameStateDTO({required this.cols, required this.rows, required this.grid});
+  GameStateDTO({
+    required this.cols,
+    required this.rows,
+    required this.grid,
+    required this.baseColorIds,
+  });
 
   GameStateDTO fromWorld(SandWorld world) {
     return GameStateDTO(
       cols: world.cols,
       rows: world.rows,
       grid: world.gridColorBuffer.toList(),
+      baseColorIds: world.baseColorIdBuffer.toList(),
     );
   }
 }

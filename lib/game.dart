@@ -210,6 +210,7 @@ class SandGame extends FlameGame with TapCallbacks {
           cols: sandWorld.cols,
           rows: sandWorld.rows,
           grid: sandWorld.gridColorBuffer.toList(),
+          baseColorIds: sandWorld.baseColorIdBuffer.toList(),
         );
         SaveGameService.instance.saveGame(gameStateDTO, ScoringService.instance.currentScore);
         _placementsSinceLastSave = 0;
@@ -485,11 +486,18 @@ class SandGame extends FlameGame with TapCallbacks {
       final rows = savedData['rows'] as int;
       final gridList = savedData['grid'] as List;
       final gridData = List<int>.from(gridList);
+      final baseColorIdsList = savedData['baseColorIds'] as List?;
+      final baseColorIds = baseColorIdsList != null ? List<int>.from(baseColorIdsList) : null;
       final score = savedData['score'] as int;
 
       // Reset world and restore grid
       sandWorld = SandWorld(cols: cols, rows: rows);
       sandWorld.gridColorBuffer.setAll(0, gridData);
+      
+      // Restore base color IDs if available
+      if (baseColorIds != null && baseColorIds.length == cols * rows) {
+        sandWorld.baseColorIdBuffer.setAll(0, baseColorIds);
+      }
 
       // Rebuild clusters from the restored grid
       sandWorld.rebuildClusters(sandWorld);
