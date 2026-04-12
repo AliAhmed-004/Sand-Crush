@@ -3,6 +3,7 @@ import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
 import 'package:sand_crush/services/milestone_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
+import 'package:sand_crush/theme/theme.dart';
 
 
 /// HUD overlay for the Sand Crush game, showing score, progress, and pause button.
@@ -161,9 +162,15 @@ class _HudOverlayState extends State<HudOverlay>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           decoration: BoxDecoration(
-            color: Colors.black.withAlpha(102), // 40% opacity
+            color: SandColors.darkBg.withAlpha(217), // Slightly more opaque
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white12, width: 1),
+            border: Border.all(color: SandColors.deepSand, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: SandColors.primaryGold.withAlpha(51), // 20% opacity
+                blurRadius: 8,
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -171,7 +178,7 @@ class _HudOverlayState extends State<HudOverlay>
               Text(
                 formattedScore,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: SandColors.primaryGold,
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
@@ -191,14 +198,18 @@ class _HudOverlayState extends State<HudOverlay>
                       child: Container(
                         height: 20,
                         decoration: BoxDecoration(
-                          color: Colors.white12,
+                          color: SandColors.sandyBeige.withAlpha(51), // 20% opacity
                           borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: SandColors.deepSand,
+                            width: 1,
+                          ),
                         ),
                         child: LinearProgressIndicator(
                           value: progress,
                           backgroundColor: Colors.transparent,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Color.lerp(Colors.blue, Colors.purple, progress)!,
+                            Color.lerp(SandColors.lightSand, SandColors.warmAccent, progress)!,
                           ),
                           minHeight: 20,
                         ),
@@ -221,17 +232,17 @@ class _HudOverlayState extends State<HudOverlay>
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white10,
+                        color: SandColors.warmAccent.withAlpha(51), // 20% opacity
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.white24,
+                          color: SandColors.primaryGold,
                           width: 2,
                         ),
                       ),
                       child: const Center(
                         child: Icon(
                           Icons.pause,
-                          color: Colors.white,
+                          color: SandColors.primaryGold,
                           size: 20,
                         ),
                       ),

@@ -3,6 +3,7 @@ import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
 import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
+import 'package:sand_crush/theme/theme.dart';
 
 /// Game Over overlay displayed when sand reaches the top threshold.
 class GameOverOverlay extends StatelessWidget {
@@ -22,9 +23,9 @@ class GameOverOverlay extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 100),
           margin: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: SandColors.mediumBg,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.red, width: 3),
+            border: Border.all(color: SandColors.deepSand, width: 3),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -34,7 +35,7 @@ class GameOverOverlay extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Colors.red,
+                  color: SandColors.warmAccent,
                 ),
               ),
               const SizedBox(height: 20),
@@ -44,7 +45,7 @@ class GameOverOverlay extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.yellow,
+                    color: SandColors.primaryGold,
                   ),
                 ),
               const SizedBox(height: 20),
@@ -53,15 +54,15 @@ class GameOverOverlay extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.amber,
+                  color: SandColors.lightSand,
                 ),
               ),
               const SizedBox(height: 15),
               Text(
                 'High Score: $highScore',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
-                  color: Colors.grey[400],
+                  color: SandColors.sandyBeige,
                 ),
               ),
               const SizedBox(height: 40),

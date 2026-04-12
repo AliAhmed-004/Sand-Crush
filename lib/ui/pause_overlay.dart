@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
+import 'package:sand_crush/theme/theme.dart';
 
 
 /// Pause overlay for the Sand Crush game.
@@ -52,9 +53,9 @@ class _PauseOverlayState extends State<PauseOverlay> {
         child: Container(
           padding: const EdgeInsets.all(40),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: SandColors.mediumBg,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white24, width: 2),
+            border: Border.all(color: SandColors.deepSand, width: 3),
           ),
           constraints: const BoxConstraints(maxWidth: 400),
           child: SingleChildScrollView(
@@ -66,7 +67,7 @@ class _PauseOverlayState extends State<PauseOverlay> {
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: SandColors.primaryGold,
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -95,7 +96,7 @@ class _PauseOverlayState extends State<PauseOverlay> {
                     onPressed: _restart,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.orange,
+                      backgroundColor: SandColors.warmAccent,
                     ),
                     child: const Text(
                       'Restart Game',
@@ -128,7 +129,7 @@ class _PauseOverlayState extends State<PauseOverlay> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white70,
+                    color: SandColors.primaryGold,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -137,8 +138,9 @@ class _PauseOverlayState extends State<PauseOverlay> {
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   decoration: BoxDecoration(
-                    color: Colors.white10,
+                    color: SandColors.sandyBeige.withAlpha(26), // 10% opacity
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: SandColors.deepSand, width: 1),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -158,7 +160,8 @@ class _PauseOverlayState extends State<PauseOverlay> {
                           });
                           // TODO: Implement sound toggle
                         },
-                        activeThumbColor: Colors.blue,
+                        activeThumbColor: SandColors.primaryGold,
+                        activeTrackColor: SandColors.warmAccent.withAlpha(128),
                       ),
                     ],
                   ),
@@ -169,8 +172,9 @@ class _PauseOverlayState extends State<PauseOverlay> {
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                   decoration: BoxDecoration(
-                    color: Colors.white10,
+                    color: SandColors.sandyBeige.withAlpha(26), // 10% opacity
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: SandColors.deepSand, width: 1),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -190,7 +194,8 @@ class _PauseOverlayState extends State<PauseOverlay> {
                           });
                           // TODO: Implement haptic toggle
                         },
-                        activeThumbColor: Colors.blue,
+                        activeThumbColor: SandColors.primaryGold,
+                        activeTrackColor: SandColors.warmAccent.withAlpha(128),
                       ),
                     ],
                   ),

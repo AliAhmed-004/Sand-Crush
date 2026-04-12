@@ -4,6 +4,7 @@ import 'package:sand_crush/game.dart';
 import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/services/save_game_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
+import 'package:sand_crush/theme/theme.dart';
 
 /// Main menu overlay for the Sand Crush game.
 class MainMenuOverlay extends StatelessWidget {
@@ -20,14 +21,18 @@ class MainMenuOverlay extends StatelessWidget {
     return Material(
       child: Container(
         padding: const EdgeInsets.all(20),
-        color: Theme.of(context).colorScheme.surface,
+        color: SandColors.darkBg,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
                 'Sand Crush',
-                style: TextStyle(fontSize: 48, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 48,
+                  fontWeight: FontWeight.bold,
+                  color: SandColors.primaryGold,
+                ),
               ),
               const SizedBox(height: 30),
               Text(
@@ -35,7 +40,7 @@ class MainMenuOverlay extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.amber,
+                  color: SandColors.lightSand,
                 ),
               ),
               const SizedBox(height: 40),
@@ -55,7 +60,7 @@ class MainMenuOverlay extends StatelessWidget {
                   'Score: ${savedScore ?? 0}',
                   style: const TextStyle(
                     fontSize: 16,
-                    color: Colors.grey,
+                    color: SandColors.sandyBeige,
                   ),
                 ),
                 const SizedBox(height: 24),

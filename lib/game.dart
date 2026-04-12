@@ -14,6 +14,7 @@ import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/services/milestone_service.dart';
 import 'package:sand_crush/services/save_game_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
+import 'package:sand_crush/theme/theme.dart';
 import 'package:sand_crush/world.dart';
 
 class SandGame extends FlameGame with TapCallbacks {
@@ -342,6 +343,20 @@ class SandGame extends FlameGame with TapCallbacks {
   void render(Canvas canvas) {
     super.render(canvas);
 
+    // Draw sand-themed gradient background
+    final backgroundRect = Rect.fromLTWH(0, 0, size.x, size.y);
+    final backgroundPaint = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(0, 0),
+        Offset(0, size.y),
+        [
+          SandColors.deepSand.withAlpha(int.parse('4d', radix: 16)), // 30% opacity
+          SandColors.darkBg,
+        ],
+        [0.0, 0.7],
+      );
+    canvas.drawRect(backgroundRect, backgroundPaint);
+
     // Update color buffer from world
     int cIdx = 0;
     final gridColorBuffer = sandWorld.gridColorBuffer;
@@ -509,18 +524,24 @@ class SandGame extends FlameGame with TapCallbacks {
     final previewY = size.y - previewSize - 40;
 
     final bgRect = Rect.fromLTWH(previewX, previewY, previewSize, previewSize);
-    canvas.drawRect(
-      bgRect,
-      Paint()
-        ..color = Colors.black
-            .withAlpha(153) // 0.6 * 255
-        ..style = PaintingStyle.fill,
-    );
+    
+    // Draw muted earth-tone gradient for preview box
+    final gradientPaint = Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(previewX, previewY),
+        Offset(previewX, previewY + previewSize),
+        [
+          SandColors.previewBoxDark,
+          SandColors.previewBoxLight,
+        ],
+        [0.0, 1.0],
+      );
+    canvas.drawRect(bgRect, gradientPaint);
 
     canvas.drawRect(
       bgRect,
       Paint()
-        ..color = Colors.white24
+        ..color = SandColors.sandyBeige
         ..style = PaintingStyle.stroke
         ..strokeWidth = 3,
     );
