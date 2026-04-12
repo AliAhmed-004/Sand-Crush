@@ -477,6 +477,31 @@ class SandGame extends FlameGame with TapCallbacks {
 
     // Draw the cached grid lines picture
     canvas.drawPicture(_gridLinesPicture);
+
+    // Draw grid border
+    final borderRect = Rect.fromLTWH(
+      gridOffset.dx,
+      gridOffset.dy,
+      cols * cellSize,
+      rows * cellSize,
+    );
+
+    canvas.drawRect(
+      borderRect,
+      Paint()
+        ..color = Colors.white38
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
+
+    // Optional: inner shadow effect with a slightly darker line
+    canvas.drawRect(
+      borderRect.inflate(-2),
+      Paint()
+        ..color = Colors.black26
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
   }
 
   void _drawNextPiecePreview(Canvas canvas) {
