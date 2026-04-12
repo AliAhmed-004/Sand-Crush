@@ -57,9 +57,6 @@ class ScoringService {
     int points = (_basePoints * multiplier * comboBonus).toInt();
     _scoreNotifier.value += points;
 
-    print(
-      'Cleared pile of size $pileSize (combo ×${comboBonus.toStringAsFixed(1)})! +$points points. Current score: ${_scoreNotifier.value}',
-    );
     _currentComboCount++;
   }
 
@@ -67,9 +64,6 @@ class ScoringService {
   /// Returns true if combo ended, false if combo is still active.
   bool endClearSessionIfNoBridges(bool anyBridgesCleared) {
     if (!anyBridgesCleared) {
-      if (_currentComboCount > 1) {
-        print('🔥 Combo! Cleared $_currentComboCount piles in one move!');
-      }
       _isInComboSession = false;
       return true; // Combo ended
     }

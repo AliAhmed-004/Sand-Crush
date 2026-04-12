@@ -294,7 +294,6 @@ class SandGame extends FlameGame with TapCallbacks {
       for (final c in availableColors) {
         if (sandWorld.clearSpanningBridge(c)) {
           anyBridgesCleared = true;
-          // print('🚀 $c has formed a left-to-right bridge!');
         }
       }
 
