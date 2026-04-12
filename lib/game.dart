@@ -82,6 +82,13 @@ class SandGame extends FlameGame with TapCallbacks {
   bool isGameStarted = false;
   bool _isGameOverDetected = false;
 
+  // Clearing animation tracking
+  static const double _clearFlashDuration = 0.05; // 50ms glow flash
+  static const double _clearWaveDuration = 0.3; // 300ms wave effect
+  double _clearingElapsedTime = 0;
+  final Map<int, double> _clearingCellAnimations = {}; // cell index → wave start time
+  List<int> _cellsToClears = []; // indices of cells that need to clear
+
   @override
   Future<void> onLoad() async {
     pauseEngine();
@@ -252,6 +259,23 @@ class SandGame extends FlameGame with TapCallbacks {
   void update(double dt) {
     super.update(dt);
 
+    // Update clearing animation if in progress
+    if (_cellsToClears.isNotEmpty) {
+      _clearingElapsedTime += dt;
+      
+      // After animation completes, finalize the clearing
+      if (_clearingElapsedTime >= _clearFlashDuration + _clearWaveDuration) {
+        sandWorld.finalizeClear(_cellsToClears);
+        _cellsToClears.clear();
+        _clearingElapsedTime = 0;
+        _clearingCellAnimations.clear();
+      }
+      
+      // Skip physics during clearing animation
+      _wasStableLastFrame = sandWorld.isStable;
+      return;
+    }
+
     // Pause game on game over
     if (sandWorld.isGameOver) {
       if (!_isGameOverDetected) {
@@ -295,6 +319,10 @@ class SandGame extends FlameGame with TapCallbacks {
       for (final c in availableColors) {
         if (sandWorld.clearSpanningBridge(c)) {
           anyBridgesCleared = true;
+          // Start clearing animation if cells were cleared
+          if (sandWorld.lastClearedIndices.isNotEmpty) {
+            _startClearingAnimation(sandWorld.lastClearedIndices);
+          }
         }
       }
 
@@ -319,9 +347,16 @@ class SandGame extends FlameGame with TapCallbacks {
     final gridColorBuffer = sandWorld.gridColorBuffer;
     for (int i = 0; i < gridColorBuffer.length; i++) {
       final colorVal = gridColorBuffer[i];
+      
+      // Apply clearing animation opacity if this cell is being cleared
+      int animatedColor = colorVal;
+      if (_cellsToClears.contains(i)) {
+        animatedColor = _getAnimatedCellColor(i, colorVal);
+      }
+      
       // 6 vertices per cell
       for (int j = 0; j < 6; j++) {
-        _colors[cIdx++] = colorVal;
+        _colors[cIdx++] = animatedColor;
       }
     }
 
@@ -336,6 +371,59 @@ class SandGame extends FlameGame with TapCallbacks {
     _drawGridLines(canvas);
     _drawGameOverThreshold(canvas);
     _drawNextPiecePreview(canvas);
+  }
+
+  void _startClearingAnimation(List<int> cellIndices) {
+    _cellsToClears = List.from(cellIndices);
+    _clearingElapsedTime = 0;
+    _clearingCellAnimations.clear();
+    
+    // Pre-calculate when each cell's wave will reach it (based on x position)
+    for (final idx in cellIndices) {
+      final x = idx % cols;
+      // Wave travels left to right, starting after flash duration
+      final cellDelayFraction = x / cols; // 0 at left, 1 at right
+      final waveStartTime = _clearFlashDuration + (cellDelayFraction * _clearWaveDuration);
+      _clearingCellAnimations[idx] = waveStartTime;
+    }
+  }
+
+  int _getAnimatedCellColor(int cellIndex, int originalColor) {
+    // Extract ARGB components
+    final alpha = (originalColor >> 24) & 0xFF;
+    final red = (originalColor >> 16) & 0xFF;
+    final green = (originalColor >> 8) & 0xFF;
+    final blue = originalColor & 0xFF;
+
+    // Glow flash phase (0 to _clearFlashDuration)
+    if (_clearingElapsedTime < _clearFlashDuration) {
+      // Brighten all cells during flash
+      final flashProgress = _clearingElapsedTime / _clearFlashDuration;
+      final brightnessFactor = 1.0 + (0.4 * flashProgress); // Brighten by up to 40%
+      
+      final newRed = ((red * brightnessFactor).clamp(0, 255)).toInt();
+      final newGreen = ((green * brightnessFactor).clamp(0, 255)).toInt();
+      final newBlue = ((blue * brightnessFactor).clamp(0, 255)).toInt();
+      
+      return (alpha << 24) | (newRed << 16) | (newGreen << 8) | newBlue;
+    }
+
+    // Wave fade phase
+    final waveStartTime = _clearingCellAnimations[cellIndex] ?? _clearFlashDuration;
+    final timeSinceWaveStart = _clearingElapsedTime - waveStartTime;
+
+    // Cell hasn't been reached by wave yet - keep original color
+    if (timeSinceWaveStart < 0) {
+      return originalColor;
+    }
+
+    // Cell is being cleared by wave - fade to transparent
+    final cellFadeProgress = (timeSinceWaveStart / _clearWaveDuration).clamp(0.0, 1.0);
+    
+    // Fade opacity from 255 to 0
+    final newAlpha = (alpha * (1.0 - cellFadeProgress)).toInt();
+    
+    return (newAlpha << 24) | (red << 16) | (green << 8) | blue;
   }
 
   void _drawGameOverThreshold(Canvas canvas) {

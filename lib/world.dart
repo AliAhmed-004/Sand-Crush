@@ -74,6 +74,9 @@ class SandWorld {
   late Set<int> _leftEdgeColors;
   late Set<int> _rightEdgeColors;
 
+  /// Track recently cleared cell indices for animation purposes
+  final List<int> lastClearedIndices = [];
+
   SandWorld({required this.cols, required this.rows})
     : gridColorBuffer = Uint32List(cols * rows),
       baseColorIdBuffer = Uint8List(cols * rows),
@@ -155,19 +158,19 @@ class SandWorld {
   /// of the same hue so cells have slightly different tones.
   Color _varyColor(Color baseColor) {
     final hsv = HSVColor.fromColor(baseColor);
-    
+
     // Vary hue slightly (±2 degrees for subtle variation)
     final hueVariation = (_random.nextDouble() - 0.5) * 4;
     final newHue = (hsv.hue + hueVariation) % 360;
-    
+
     // Vary saturation slightly (±5% for subtle depth)
     final satVariation = (_random.nextDouble() - 0.5) * 0.1;
     final newSaturation = (hsv.saturation + satVariation).clamp(0.0, 1.0);
-    
+
     // Vary value (brightness) slightly (±8% for tonal variation)
     final valueVariation = (_random.nextDouble() - 0.5) * 0.16;
     final newValue = (hsv.value + valueVariation).clamp(0.0, 1.0);
-    
+
     return HSVColor.fromAHSV(
       hsv.alpha,
       newHue,
@@ -519,7 +522,7 @@ class SandWorld {
 
     final colorId = _getColorId(color);
     if (colorId == -1) return false; // Color not found
-    
+
     bool touchesLeft = false;
     bool touchesRight = false;
     for (int y = 0; y < rows; y++) {
@@ -583,10 +586,11 @@ class SandWorld {
 
     final colorId = _getColorId(color);
     if (colorId == -1) return false; // Color not found
-    
+
     // Quick reject: use cached edge color info instead of scanning edges
     // This saves O(rows * 2) operations per color check
-    if (!_leftEdgeColors.contains(colorId) || !_rightEdgeColors.contains(colorId)) {
+    if (!_leftEdgeColors.contains(colorId) ||
+        !_rightEdgeColors.contains(colorId)) {
       return false;
     }
 
@@ -648,17 +652,26 @@ class SandWorld {
 
     if (!reachesRight) return false;
 
+    // Store cleared indices for animation BEFORE clearing from grid
+    lastClearedIndices.clear();
+    lastClearedIndices.addAll(toClear);
+
     // Award points for clearing the bridge
     ScoringService.instance.addSandClearPoints(1, toClear.length);
 
-    // Clear the identified bridge cells
-    for (final idx in toClear) {
+    // Don't clear yet - let the game animate them first, then call finalizeClear
+    return true;
+  }
+
+  /// Called by the game after clear animation completes to finalize the clearing
+  void finalizeClear(List<int> indices) {
+    for (final idx in indices) {
       gridColorBuffer[idx] = 0;
+      baseColorIdBuffer[idx] = 0;
       cellIdMap[idx] = 0;
     }
 
     _cleanupStaleClusters();
-    return true;
   }
 
   /// After clearing cells directly in the grid, some clusters may have lost all their cells or become invalid.
@@ -709,7 +722,7 @@ class SandWorld {
     world._previousFrameCellIndices.clear();
     world._leftEdgeColors.clear();
     world._rightEdgeColors.clear();
-    
+
     final visited = <int>{};
     final cols = world.cols;
     final rows = world.rows;
@@ -722,7 +735,7 @@ class SandWorld {
       final colorId = world.baseColorIdBuffer[i] != 0
           ? world.baseColorIdBuffer[i]
           : world._getColorIdFromValue(color);
-      
+
       final queue = [i];
       final cells = <Cell>[];
 
