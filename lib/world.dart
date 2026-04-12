@@ -93,6 +93,64 @@ class SandWorld {
   // PRIVATE HELPERS
   // =========================================================
 
+  bool _wouldAnyGrainMoveIfClusterBreaksApart(Cluster cluster) {
+    // If the cluster is a single cell, it's already a grain.
+    if (cluster.cells.length <= 1) return false;
+
+    for (final cell in cluster.cells) {
+      final x = cell.x;
+      final y = cell.y;
+
+      // Falling straight down.
+      final belowY = y + 1;
+      if (belowY < rows) {
+        final belowIdx = belowY * cols + x;
+        if (cellIdMap[belowIdx] == 0) {
+          return true;
+        }
+      }
+
+      // Diagonal slide (only relevant if straight-down is blocked).
+      if (belowY >= rows) continue;
+      final belowIdx = belowY * cols + x;
+      if (cellIdMap[belowIdx] == 0) continue;
+
+      final twoBelowY = y + 2;
+
+      // Down-left.
+      final leftX = x - 1;
+      if (leftX >= 0) {
+        final downLeftIdx = belowY * cols + leftX;
+        if (cellIdMap[downLeftIdx] == 0) {
+          if (twoBelowY >= rows) {
+            return true;
+          }
+          final supportIdx = twoBelowY * cols + leftX;
+          if (cellIdMap[supportIdx] != 0) {
+            return true;
+          }
+        }
+      }
+
+      // Down-right.
+      final rightX = x + 1;
+      if (rightX < cols) {
+        final downRightIdx = belowY * cols + rightX;
+        if (cellIdMap[downRightIdx] == 0) {
+          if (twoBelowY >= rows) {
+            return true;
+          }
+          final supportIdx = twoBelowY * cols + rightX;
+          if (cellIdMap[supportIdx] != 0) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   /// Maps a base Color to its color ID (0-5)
   int _getColorId(Color color) {
     final colors = [
@@ -400,7 +458,13 @@ class SandWorld {
       }
 
       if (cluster.cells.length > 1) {
+        final willMoveAsGrains = _wouldAnyGrainMoveIfClusterBreaksApart(cluster);
         _breakApartCluster(cluster);
+        if (willMoveAsGrains) {
+          // Only mark the board unstable if the newly created grains could
+          // actually move on the next tick.
+          anyMovement = true;
+        }
         continue;
       }
     }
