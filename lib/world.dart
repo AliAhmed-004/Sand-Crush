@@ -526,8 +526,15 @@ class SandWorld {
     bool touchesLeft = false;
     bool touchesRight = false;
     for (int y = 0; y < rows; y++) {
-      if (baseColorIdBuffer[y * cols] == colorId) touchesLeft = true;
-      if (baseColorIdBuffer[y * cols + (cols - 1)] == colorId) {
+      final leftIdx = y * cols;
+      if (gridColorBuffer[leftIdx] != 0 &&
+          baseColorIdBuffer[leftIdx] == colorId) {
+        touchesLeft = true;
+      }
+
+      final rightIdx = y * cols + (cols - 1);
+      if (gridColorBuffer[rightIdx] != 0 &&
+          baseColorIdBuffer[rightIdx] == colorId) {
         touchesRight = true;
       }
     }
@@ -538,7 +545,7 @@ class SandWorld {
 
     for (int y = 0; y < rows; y++) {
       final idx = y * cols;
-      if (baseColorIdBuffer[idx] == colorId) {
+      if (gridColorBuffer[idx] != 0 && baseColorIdBuffer[idx] == colorId) {
         visited[idx] = 1;
         queue.add(idx);
       }
@@ -560,7 +567,9 @@ class SandWorld {
       final currIdx = queue[head++];
       final cx = currIdx % cols;
 
-      if (cx == cols - 1) return true;
+      if (cx == cols - 1) {
+        return true;
+      }
 
       for (final offset in neighbors) {
         final nextIdx = currIdx + offset;
@@ -571,7 +580,9 @@ class SandWorld {
           continue;
         }
 
-        if (visited[nextIdx] == 0 && baseColorIdBuffer[nextIdx] == colorId) {
+        if (visited[nextIdx] == 0 &&
+            gridColorBuffer[nextIdx] != 0 &&
+            baseColorIdBuffer[nextIdx] == colorId) {
           visited[nextIdx] = 1;
           queue.add(nextIdx);
         }
@@ -602,7 +613,7 @@ class SandWorld {
     // Start BFS from all cells of the target color on the left edge
     for (int y = 0; y < rows; y++) {
       final idx = y * cols;
-      if (baseColorIdBuffer[idx] == colorId) {
+      if (gridColorBuffer[idx] != 0 && baseColorIdBuffer[idx] == colorId) {
         visited[idx] = 1;
         queue.add(idx);
         toClear.add(idx);
@@ -630,7 +641,9 @@ class SandWorld {
     while (head < queue.length) {
       final currIdx = queue[head++];
       final cx = currIdx % cols;
-      if (cx == cols - 1) reachesRight = true;
+      if (cx == cols - 1) {
+        reachesRight = true;
+      }
 
       // Explore all 8 neighbors
       for (final offset in neighbors) {
@@ -642,7 +655,9 @@ class SandWorld {
           continue;
         }
 
-        if (visited[nextIdx] == 0 && baseColorIdBuffer[nextIdx] == colorId) {
+        if (visited[nextIdx] == 0 &&
+            gridColorBuffer[nextIdx] != 0 &&
+            baseColorIdBuffer[nextIdx] == colorId) {
           visited[nextIdx] = 1;
           queue.add(nextIdx);
           toClear.add(nextIdx);

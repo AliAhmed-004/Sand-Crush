@@ -198,6 +198,7 @@ class SandGame extends FlameGame with TapCallbacks {
 
   @override
   void onTapDown(TapDownEvent event) {
+    if (_cellsToClears.isNotEmpty) return;
     if (!sandWorld.isStable) return;
     if (sandWorld.isGameOver) return;
 
@@ -317,14 +318,17 @@ class SandGame extends FlameGame with TapCallbacks {
       final availableColors = DifficultyService.instance.getAvailableColors(currentScore);
       
       bool anyBridgesCleared = false;
+      final indicesToClear = <int>{};
       for (final c in availableColors) {
         if (sandWorld.clearSpanningBridge(c)) {
           anyBridgesCleared = true;
-          // Start clearing animation if cells were cleared
-          if (sandWorld.lastClearedIndices.isNotEmpty) {
-            _startClearingAnimation(sandWorld.lastClearedIndices);
-          }
+          indicesToClear.addAll(sandWorld.lastClearedIndices);
         }
+      }
+
+      // Start one clear animation for all cleared bridges.
+      if (indicesToClear.isNotEmpty) {
+        _startClearingAnimation(indicesToClear.toList());
       }
 
       // Only end combo if no bridges were found
