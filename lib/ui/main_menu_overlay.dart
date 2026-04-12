@@ -256,6 +256,7 @@ class _MainMenuOverlayState extends State<MainMenuOverlay>
                       _MenuButton(
                         label: 'Start New Game',
                         onPressed: () {
+                          SaveGameService.instance.deleteSavedGame();
                           widget.game.resetGameState();
                           ScoringService.instance.resetScore();
                           widget.game.isGameStarted = true;
