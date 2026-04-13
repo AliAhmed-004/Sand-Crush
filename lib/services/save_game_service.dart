@@ -17,6 +17,8 @@ class SaveGameService {
   static SaveGameService get instance => _instance;
 
   late Box _box;
+  bool _isSaving = false;
+  Map<String, dynamic>? _pendingState;
 
   /// Initialize Hive and open the game state box.
   /// Call this once during app initialization.
@@ -30,10 +32,25 @@ class SaveGameService {
       'cols': gameState.cols,
       'rows': gameState.rows,
       'grid': gameState.grid,
+      'baseColorIds': gameState.baseColorIds,
       'score': score,
     };
 
-    await _box.put(GameConfig.savedGameStateKey, state);
+    _pendingState = state;
+    if (_isSaving) {
+      return;
+    }
+
+    _isSaving = true;
+    try {
+      while (_pendingState != null) {
+        final stateToWrite = _pendingState!;
+        _pendingState = null;
+        await _box.put(GameConfig.savedGameStateKey, stateToWrite);
+      }
+    } finally {
+      _isSaving = false;
+    }
   }
 
   // Method to load the game state from Hive. Returns null if no saved state exists.

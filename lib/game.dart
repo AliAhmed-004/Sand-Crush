@@ -50,9 +50,12 @@ class SandGame extends FlameGame with TapCallbacks {
   // Fixed timestep accumulator
   double _accumulator = 0;
   static const double _step = 1 / 60;
+  static const double _maxFrameDt = 0.05;
+  static const int _maxSubStepsPerFrame = 4;
 
   // Track stability to trigger bridge checks only when the board transitions from unstable to stable
   bool _wasStableLastFrame = true;
+  bool _needsSimulation = false;
 
   // Debounced save frequency: save game state only after every N successful placements
   static const int _saveInterval = 5;
@@ -89,6 +92,7 @@ class SandGame extends FlameGame with TapCallbacks {
   double _clearingElapsedTime = 0;
   final Map<int, double> _clearingCellAnimations = {}; // cell index → wave start time
   List<int> _cellsToClears = []; // indices of cells that need to clear
+  late Uint8List _clearMask;
 
   @override
   Future<void> onLoad() async {
@@ -99,6 +103,7 @@ class SandGame extends FlameGame with TapCallbacks {
     // Pre-allocate buffers for vertices (2 triangles per cell = 6 vertices, each with x,y)
     _vertices = Float32List(cols * rows * 12);
     _colors = Int32List(cols * rows * 6);
+    _clearMask = Uint8List(cols * rows);
 
     // Initialize and layout NEXT TextPainter once
     _nextTextPainter = TextPainter(
@@ -192,6 +197,33 @@ class SandGame extends FlameGame with TapCallbacks {
     }
   }
 
+  void _setCellColorInVertexBuffer(int cellIndex, int color) {
+    if (cellIndex < 0 || cellIndex >= cols * rows) return;
+
+    final colorBase = cellIndex * 6;
+    for (int j = 0; j < 6; j++) {
+      _colors[colorBase + j] = color;
+    }
+  }
+
+  void _applyWorldDirtyCellColors() {
+    final dirty = sandWorld.lastDirtyCellIndices;
+    final dirtyCount = sandWorld.lastDirtyCellCount;
+    final gridColorBuffer = sandWorld.gridColorBuffer;
+
+    for (int i = 0; i < dirtyCount; i++) {
+      final cellIndex = dirty[i];
+      _setCellColorInVertexBuffer(cellIndex, gridColorBuffer[cellIndex]);
+    }
+  }
+
+  void _syncAllCellColorsFromWorld() {
+    final gridColorBuffer = sandWorld.gridColorBuffer;
+    for (int i = 0; i < gridColorBuffer.length; i++) {
+      _setCellColorInVertexBuffer(i, gridColorBuffer[i]);
+    }
+  }
+
   // =========================================================
   // INPUT
   // =========================================================
@@ -211,6 +243,10 @@ class SandGame extends FlameGame with TapCallbacks {
     // Only generate next piece if placement was successful
     if (sandWorld.placeShape(nextShape, gridX, gridY, nextColor)) {
       _generateNextPiece();
+      _needsSimulation = true;
+      // Show placement immediately instead of waiting for the next fixed step.
+      sandWorld.syncGridNow();
+      _applyWorldDirtyCellColors();
       
       // Debounced save: only save every N placements
       _placementsSinceLastSave++;
@@ -268,9 +304,16 @@ class SandGame extends FlameGame with TapCallbacks {
       // After animation completes, finalize the clearing
       if (_clearingElapsedTime >= _clearFlashDuration + _clearWaveDuration) {
         sandWorld.finalizeClear(_cellsToClears);
+        for (final idx in _cellsToClears) {
+          if (idx >= 0 && idx < _clearMask.length) {
+            _clearMask[idx] = 0;
+          }
+          _setCellColorInVertexBuffer(idx, 0);
+        }
         _cellsToClears.clear();
         _clearingElapsedTime = 0;
         _clearingCellAnimations.clear();
+        _needsSimulation = true;
       }
       
       // Skip physics during clearing animation
@@ -292,11 +335,28 @@ class SandGame extends FlameGame with TapCallbacks {
       return;
     }
 
-    _accumulator += dt;
+    final shouldSimulate = _needsSimulation || !sandWorld.isStable;
+    if (shouldSimulate) {
+      final frameDt = dt > _maxFrameDt ? _maxFrameDt : dt;
+      _accumulator += frameDt;
 
-    while (_accumulator >= _step) {
-      sandWorld.update(_step);
-      _accumulator -= _step;
+      int subSteps = 0;
+      while (_accumulator >= _step && subSteps < _maxSubStepsPerFrame) {
+        sandWorld.update(_step);
+        _applyWorldDirtyCellColors();
+        _accumulator -= _step;
+        subSteps++;
+      }
+
+      if (subSteps == _maxSubStepsPerFrame) {
+        _accumulator = 0;
+      }
+
+      if (subSteps > 0 && sandWorld.isStable) {
+        _needsSimulation = false;
+      }
+    } else {
+      _accumulator = 0;
     }
 
     // Check for milestone changes
@@ -361,21 +421,12 @@ class SandGame extends FlameGame with TapCallbacks {
       );
     canvas.drawRect(backgroundRect, backgroundPaint);
 
-    // Update color buffer from world
-    int cIdx = 0;
-    final gridColorBuffer = sandWorld.gridColorBuffer;
-    for (int i = 0; i < gridColorBuffer.length; i++) {
-      final colorVal = gridColorBuffer[i];
-      
-      // Apply clearing animation opacity if this cell is being cleared
-      int animatedColor = colorVal;
-      if (_cellsToClears.contains(i)) {
-        animatedColor = _getAnimatedCellColor(i, colorVal);
-      }
-      
-      // 6 vertices per cell
-      for (int j = 0; j < 6; j++) {
-        _colors[cIdx++] = animatedColor;
+    // Animate only currently clearing cells; all others are updated through dirty world sync.
+    if (_cellsToClears.isNotEmpty) {
+      final gridColorBuffer = sandWorld.gridColorBuffer;
+      for (final cellIndex in _cellsToClears) {
+        final animatedColor = _getAnimatedCellColor(cellIndex, gridColorBuffer[cellIndex]);
+        _setCellColorInVertexBuffer(cellIndex, animatedColor);
       }
     }
 
@@ -393,6 +444,12 @@ class SandGame extends FlameGame with TapCallbacks {
   }
 
   void _startClearingAnimation(List<int> cellIndices) {
+    for (final idx in _cellsToClears) {
+      if (idx >= 0 && idx < _clearMask.length) {
+        _clearMask[idx] = 0;
+      }
+    }
+
     _cellsToClears = List.from(cellIndices);
     _clearingElapsedTime = 0;
     _clearingCellAnimations.clear();
@@ -404,6 +461,9 @@ class SandGame extends FlameGame with TapCallbacks {
       final cellDelayFraction = x / cols; // 0 at left, 1 at right
       final waveStartTime = _clearFlashDuration + (cellDelayFraction * _clearWaveDuration);
       _clearingCellAnimations[idx] = waveStartTime;
+      if (idx >= 0 && idx < _clearMask.length) {
+        _clearMask[idx] = 1;
+      }
     }
   }
 
@@ -605,8 +665,14 @@ class SandGame extends FlameGame with TapCallbacks {
     _isGameOverDetected = false;
     _previousMilestone = 0;
     _wasStableLastFrame = true;
+    _needsSimulation = false;
     _accumulator = 0;
     _placementsSinceLastSave = 0;
+    _cellsToClears.clear();
+    _clearingCellAnimations.clear();
+    _clearingElapsedTime = 0;
+    _clearMask.fillRange(0, _clearMask.length, 0);
+    _colors.fillRange(0, _colors.length, 0);
     _updateVertexPositions();
   }
 
@@ -631,6 +697,9 @@ class SandGame extends FlameGame with TapCallbacks {
 
       // Reset world and restore grid
       sandWorld = SandWorld(cols: cols, rows: rows);
+      if (_clearMask.length != cols * rows) {
+        _clearMask = Uint8List(cols * rows);
+      }
       sandWorld.gridColorBuffer.setAll(0, gridData);
       
       // Restore base color IDs if available
@@ -649,8 +718,14 @@ class SandGame extends FlameGame with TapCallbacks {
       _isGameOverDetected = false;
       _previousMilestone = 0;
       _wasStableLastFrame = true;
+      _needsSimulation = false;
       _accumulator = 0;
       _placementsSinceLastSave = 0;
+      _cellsToClears.clear();
+      _clearingCellAnimations.clear();
+      _clearingElapsedTime = 0;
+      _clearMask.fillRange(0, _clearMask.length, 0);
+      _syncAllCellColorsFromWorld();
       _updateVertexPositions();
     } catch (e) {
       // Silently fail if load is corrupted

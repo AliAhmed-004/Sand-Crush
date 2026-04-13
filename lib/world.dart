@@ -66,13 +66,29 @@ class SandWorld {
   late List<Cluster> _cachedClusterList;
   int _lastKnownClusterCount = 0;
 
-  // Dirty region tracking: stores cell indices that were occupied last frame
-  // Used to efficiently clear only the cells that changed
-  late Set<int> _previousFrameCellIndices;
+  // Dirty region tracking with reusable buffers to avoid per-frame Set allocations
+  late Int32List _previousFrameCellIndices;
+  int _previousFrameCellCount = 0;
+  late Int32List _currentFrameCellIndices;
+  int _currentFrameCellCount = 0;
+  late Int32List _lastDirtyCellIndices;
+  int _lastDirtyCellCount = 0;
+
+  Int32List get lastDirtyCellIndices => _lastDirtyCellIndices;
+  int get lastDirtyCellCount => _lastDirtyCellCount;
 
   // Bridge detection optimization: cache which colors touch edges
   late Set<int> _leftEdgeColors;
   late Set<int> _rightEdgeColors;
+
+  // Reusable BFS buffers to avoid per-call allocations in bridge checks.
+  late Uint32List _visitStampBuffer;
+  int _visitStamp = 1;
+  late Int32List _bfsQueue;
+  int _bfsHead = 0;
+  int _bfsTail = 0;
+  late Int32List _clearIndicesBuffer;
+  int _clearIndicesCount = 0;
 
   /// Track recently cleared cell indices for animation purposes
   final List<int> lastClearedIndices = [];
@@ -83,9 +99,14 @@ class SandWorld {
       cellIdMap = Int32List(cols * rows) {
     _isStable = true;
     _cachedClusterList = [];
-    _previousFrameCellIndices = <int>{};
+    _previousFrameCellIndices = Int32List(cols * rows);
+    _currentFrameCellIndices = Int32List(cols * rows);
+    _lastDirtyCellIndices = Int32List(cols * rows * 2);
     _leftEdgeColors = <int>{};
     _rightEdgeColors = <int>{};
+    _visitStampBuffer = Uint32List(cols * rows);
+    _bfsQueue = Int32List(cols * rows);
+    _clearIndicesBuffer = Int32List(cols * rows);
     _gameOverThresholdRow = (rows * 0.1).ceil(); // Top 10% of rows
   }
 
@@ -321,6 +342,12 @@ class SandWorld {
     _syncGridFromClusters();
   }
 
+  /// Immediately syncs cluster data into render buffers.
+  /// Useful for showing newly placed blocks without waiting for a sim tick.
+  void syncGridNow() {
+    _syncGridFromClusters();
+  }
+
   /// Merges adjacent same-color 1-cell clusters to reduce fragmentation.
   /// Call this after the board stabilizes (isStable == true).
   void mergeAdjacentClusters() {
@@ -544,15 +571,19 @@ class SandWorld {
   // =========================================================
 
   void _syncGridFromClusters() {
+    _lastDirtyCellCount = 0;
+
     // Cell-level dirty tracking: clear only cells that were occupied in previous frame
     // This is much more efficient than clearing the entire 8000-cell buffer every frame
-    for (final cellIndex in _previousFrameCellIndices) {
+    for (int i = 0; i < _previousFrameCellCount; i++) {
+      final cellIndex = _previousFrameCellIndices[i];
       gridColorBuffer[cellIndex] = 0;
       baseColorIdBuffer[cellIndex] = 0;
+      _lastDirtyCellIndices[_lastDirtyCellCount++] = cellIndex;
     }
 
     // Collect current frame cell indices and edge colors for bridge detection optimization
-    final currentFrameCellIndices = <int>{};
+    _currentFrameCellCount = 0;
     _leftEdgeColors.clear();
     _rightEdgeColors.clear();
 
@@ -564,7 +595,8 @@ class SandWorld {
           final colorVal = cell.color.toARGB32();
           gridColorBuffer[cellIndex] = colorVal;
           baseColorIdBuffer[cellIndex] = cell.baseColorId;
-          currentFrameCellIndices.add(cellIndex);
+          _currentFrameCellIndices[_currentFrameCellCount++] = cellIndex;
+          _lastDirtyCellIndices[_lastDirtyCellCount++] = cellIndex;
 
           // Track which color IDs touch the edges for bridge detection optimization
           if (cell.x == 0) {
@@ -577,8 +609,12 @@ class SandWorld {
       }
     }
 
-    // Swap tracking set for next frame
-    _previousFrameCellIndices = currentFrameCellIndices;
+    // Swap tracking buffers for next frame
+    final prevBuffer = _previousFrameCellIndices;
+    _previousFrameCellIndices = _currentFrameCellIndices;
+    _currentFrameCellIndices = prevBuffer;
+    _previousFrameCellCount = _currentFrameCellCount;
+    _currentFrameCellCount = 0;
   }
 
   bool doesColorSpanLeftToRight(Color color) {
@@ -669,18 +705,24 @@ class SandWorld {
       return false;
     }
 
-    // BFS to find all connected cells of the color starting from the left edge
-    final visited = Uint8List(rows * cols);
-    final queue = <int>[];
-    final toClear = <int>[];
+    // BFS to find all connected cells of the color starting from the left edge.
+    // Reuse world buffers to keep this path allocation-free.
+    _visitStamp++;
+    if (_visitStamp == 0) {
+      _visitStamp = 1;
+      _visitStampBuffer.fillRange(0, _visitStampBuffer.length, 0);
+    }
+    _bfsHead = 0;
+    _bfsTail = 0;
+    _clearIndicesCount = 0;
 
     // Start BFS from all cells of the target color on the left edge
     for (int y = 0; y < rows; y++) {
       final idx = y * cols;
       if (gridColorBuffer[idx] != 0 && baseColorIdBuffer[idx] == colorId) {
-        visited[idx] = 1;
-        queue.add(idx);
-        toClear.add(idx);
+        _visitStampBuffer[idx] = _visitStamp;
+        _bfsQueue[_bfsTail++] = idx;
+        _clearIndicesBuffer[_clearIndicesCount++] = idx;
       }
     }
 
@@ -699,11 +741,9 @@ class SandWorld {
       -cols - 1,
     ];
 
-    int head = 0;
-
     // Standard BFS loop
-    while (head < queue.length) {
-      final currIdx = queue[head++];
+    while (_bfsHead < _bfsTail) {
+      final currIdx = _bfsQueue[_bfsHead++];
       final cx = currIdx % cols;
       if (cx == cols - 1) {
         reachesRight = true;
@@ -719,12 +759,12 @@ class SandWorld {
           continue;
         }
 
-        if (visited[nextIdx] == 0 &&
+        if (_visitStampBuffer[nextIdx] != _visitStamp &&
             gridColorBuffer[nextIdx] != 0 &&
             baseColorIdBuffer[nextIdx] == colorId) {
-          visited[nextIdx] = 1;
-          queue.add(nextIdx);
-          toClear.add(nextIdx);
+          _visitStampBuffer[nextIdx] = _visitStamp;
+          _bfsQueue[_bfsTail++] = nextIdx;
+          _clearIndicesBuffer[_clearIndicesCount++] = nextIdx;
         }
       }
     }
@@ -733,10 +773,12 @@ class SandWorld {
 
     // Store cleared indices for animation BEFORE clearing from grid
     lastClearedIndices.clear();
-    lastClearedIndices.addAll(toClear);
+    for (int i = 0; i < _clearIndicesCount; i++) {
+      lastClearedIndices.add(_clearIndicesBuffer[i]);
+    }
 
     // Award points for clearing the bridge
-    ScoringService.instance.addSandClearPoints(1, toClear.length);
+    ScoringService.instance.addSandClearPoints(1, _clearIndicesCount);
 
     // Don't clear yet - let the game animate them first, then call finalizeClear
     return true;
@@ -798,7 +840,9 @@ class SandWorld {
   // Rebuild cluster from saved game
   void rebuildClusters(SandWorld world) {
     // Clear dirty tracking and edge colors to get fresh state after rebuild
-    world._previousFrameCellIndices.clear();
+    world._previousFrameCellCount = 0;
+    world._currentFrameCellCount = 0;
+    world._lastDirtyCellCount = 0;
     world._leftEdgeColors.clear();
     world._rightEdgeColors.clear();
 
