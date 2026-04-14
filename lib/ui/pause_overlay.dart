@@ -32,7 +32,7 @@ class _PauseOverlayState extends State<PauseOverlay> {
   }
 
   void _restart() {
-    SaveGameService.instance.deleteSavedGame();
+    // SaveGameService.instance.deleteSavedGame();
     widget.game.resetGameState();
     widget.game.resumeEngine();
     widget.game.overlays.remove(GameConfig.pauseOverlay);

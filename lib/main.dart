@@ -16,7 +16,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
   await HighScoreService.instance.initialize();
-  await SaveGameService.instance.initialize();
+  // await SaveGameService.instance.initialize();
   runApp(const SandCrush());
 }
 

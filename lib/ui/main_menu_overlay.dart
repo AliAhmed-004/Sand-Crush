@@ -125,8 +125,8 @@ class _MainMenuOverlayState extends State<MainMenuOverlay>
   @override
   Widget build(BuildContext context) {
     final highScore = HighScoreService.instance.getHighScore();
-    final hasSavedGame = SaveGameService.instance.hasSavedGame();
-    final savedScore = SaveGameService.instance.getSavedScore();
+    // final hasSavedGame = SaveGameService.instance.hasSavedGame();
+    // final savedScore = SaveGameService.instance.getSavedScore();
 
     return Material(
       child: Container(
@@ -238,25 +238,25 @@ class _MainMenuOverlayState extends State<MainMenuOverlay>
                   // Buttons section
                   Column(
                     children: [
-                      if (hasSavedGame) ...[
-                        _MenuButton(
-                          label: 'Continue Game - Score: $savedScore',
-                          onPressed: () {
-                            widget.game.loadSavedGame();
-                            widget.game.isGameStarted = true;
-                            widget.game.resumeEngine();
-                            widget.game.overlays
-                                .remove(GameConfig.mainMenuOverlay);
-                            widget.game.overlays.add(GameConfig.hudOverlay);
-                          },
-                          color: SandColors.warmAccent,
-                        ),
-                        const SizedBox(height: 12),
-                      ],
+                      // if (hasSavedGame) ...[
+                      //   _MenuButton(
+                      //     label: 'Continue Game - Score: $savedScore',
+                      //     onPressed: () {
+                      //       widget.game.loadSavedGame();
+                      //       widget.game.isGameStarted = true;
+                      //       widget.game.resumeEngine();
+                      //       widget.game.overlays
+                      //           .remove(GameConfig.mainMenuOverlay);
+                      //       widget.game.overlays.add(GameConfig.hudOverlay);
+                      //     },
+                      //     color: SandColors.warmAccent,
+                      //   ),
+                      //   const SizedBox(height: 12),
+                      // ],
                       _MenuButton(
                         label: 'Start New Game',
                         onPressed: () {
-                          SaveGameService.instance.deleteSavedGame();
+                          // SaveGameService.instance.deleteSavedGame();
                           widget.game.resetGameState();
                           ScoringService.instance.resetScore();
                           widget.game.isGameStarted = true;

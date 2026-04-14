@@ -86,6 +86,11 @@ class SandGame extends FlameGame with TapCallbacks {
   double _lastGridLinesOffsetY = -1;
   double _lastGridLinesScale = -1;
 
+  // Performance optimization: cached background as Picture
+  ui.Picture? _backgroundPicture;
+  double _lastBackgroundWidth = -1;
+  double _lastBackgroundHeight = -1;
+
   // Track milestone for celebration overlay
   int _previousMilestone = 0;
 
@@ -198,6 +203,10 @@ class SandGame extends FlameGame with TapCallbacks {
     // Recompute static vertex positions if buffers are ready
     if (_isLoaded) {
       _updateVertexPositions();
+      // Invalidate cached background picture when size changes
+      _lastBackgroundWidth = -1;
+      _lastBackgroundHeight = -1;
+      _backgroundPicture = null;
       // Invalidate cached grid lines picture when size changes
       _lastGridLinesOffsetX = -1;
       _lastGridLinesOffsetY = -1;
@@ -437,9 +446,9 @@ class SandGame extends FlameGame with TapCallbacks {
       ScoringService.instance.endClearSessionIfNoBridges(anyBridgesCleared);
     }
 
-    if (_hasPendingAutosave && sandWorld.isStable && !_needsSimulation) {
-      _triggerAutosave();
-    }
+    // if (_hasPendingAutosave && sandWorld.isStable && !_needsSimulation) {
+    //   _triggerAutosave();
+    // }
 
     _wasStableLastFrame = sandWorld.isStable;
   }
@@ -457,11 +466,11 @@ class SandGame extends FlameGame with TapCallbacks {
       baseColorIds: sandWorld.baseColorIdBuffer.toList(growable: false),
     );
 
-    SaveGameService.instance
-        .saveGame(gameStateDTO, ScoringService.instance.currentScore)
-        .whenComplete(() {
-          _isAutosaveInFlight = false;
-        });
+    // SaveGameService.instance
+    //     .saveGame(gameStateDTO, ScoringService.instance.currentScore)
+    //     .whenComplete(() {
+    //       _isAutosaveInFlight = false;
+    //     });
   }
 
   // =========================================================
@@ -472,19 +481,7 @@ class SandGame extends FlameGame with TapCallbacks {
   void render(Canvas canvas) {
     super.render(canvas);
 
-    // Draw sand-themed gradient background
-    final backgroundRect = Rect.fromLTWH(0, 0, size.x, size.y);
-    final backgroundPaint = Paint()
-      ..shader = ui.Gradient.linear(
-        Offset(0, 0),
-        Offset(0, size.y),
-        [
-          SandColors.deepSand.withAlpha(0x4D), // 30% opacity
-          SandColors.darkBg,
-        ],
-        [0.0, 0.7],
-      );
-    canvas.drawRect(backgroundRect, backgroundPaint);
+    _drawBackground(canvas);
 
     // Animate only currently clearing cells
     if (_cellsToClears.isNotEmpty) {
@@ -511,8 +508,11 @@ class SandGame extends FlameGame with TapCallbacks {
 
     canvas.drawVertices(_cachedVertices!, BlendMode.src, _verticesPaint);
 
+    // Canvas is cleared every frame, so cached static elements must still be
+    // drawn every frame even if their picture generation is memoized.
     _drawGridLines(canvas);
     _drawGameOverThreshold(canvas);
+    
     _drawNextPiecePreview(canvas);
   }
 
@@ -582,6 +582,30 @@ class SandGame extends FlameGame with TapCallbacks {
     final newAlpha = (alpha * (1.0 - cellFadeProgress)).toInt();
 
     return (newAlpha << 24) | (red << 16) | (green << 8) | blue;
+  }
+
+  void _drawBackground(Canvas canvas) {
+    if (_backgroundPicture == null ||
+        _lastBackgroundWidth != size.x ||
+        _lastBackgroundHeight != size.y) {
+      final recorder = ui.PictureRecorder();
+      final recordingCanvas = Canvas(recorder);
+      final backgroundRect = Rect.fromLTWH(0, 0, size.x, size.y);
+      final backgroundPaint = Paint()
+        ..shader = ui.Gradient.linear(
+          const Offset(0, 0),
+          Offset(0, size.y),
+          [SandColors.deepSand, SandColors.darkBg],
+          [0.0, 1.0],
+        );
+
+      recordingCanvas.drawRect(backgroundRect, backgroundPaint);
+      _backgroundPicture = recorder.endRecording();
+      _lastBackgroundWidth = size.x;
+      _lastBackgroundHeight = size.y;
+    }
+
+    canvas.drawPicture(_backgroundPicture!);
   }
 
   void _drawGameOverThreshold(Canvas canvas) {
@@ -757,62 +781,62 @@ class SandGame extends FlameGame with TapCallbacks {
   }
 
   /// Loads a saved game state and rebuilds the world from the saved grid.
-  void loadSavedGame() {
-    final saveService = SaveGameService.instance;
-    final savedData = saveService.loadGame();
+  // void loadSavedGame() {
+  //   // final saveService = SaveGameService.instance;
+  //   // final savedData = saveService.loadGame();
 
-    if (savedData == null) {
-      return;
-    }
+  //   if (savedData == null) {
+  //     return;
+  //   }
 
-    try {
-      // Restore the grid data
-      final cols = savedData['cols'] as int;
-      final rows = savedData['rows'] as int;
-      final gridList = savedData['grid'] as List;
-      final gridData = List<int>.from(gridList);
-      final baseColorIdsList = savedData['baseColorIds'] as List?;
-      final baseColorIds = baseColorIdsList != null
-          ? List<int>.from(baseColorIdsList)
-          : null;
-      final score = savedData['score'] as int;
+  //   try {
+  //     // Restore the grid data
+  //     final cols = savedData['cols'] as int;
+  //     final rows = savedData['rows'] as int;
+  //     final gridList = savedData['grid'] as List;
+  //     final gridData = List<int>.from(gridList);
+  //     final baseColorIdsList = savedData['baseColorIds'] as List?;
+  //     final baseColorIds = baseColorIdsList != null
+  //         ? List<int>.from(baseColorIdsList)
+  //         : null;
+  //     final score = savedData['score'] as int;
 
-      // Reset world and restore grid
-      sandWorld = SandWorld(cols: cols, rows: rows);
-      if (_clearMask.length != cols * rows) {
-        _clearMask = Uint8List(cols * rows);
-      }
-      sandWorld.gridColorBuffer.setAll(0, gridData);
+  //     // Reset world and restore grid
+  //     sandWorld = SandWorld(cols: cols, rows: rows);
+  //     if (_clearMask.length != cols * rows) {
+  //       _clearMask = Uint8List(cols * rows);
+  //     }
+  //     sandWorld.gridColorBuffer.setAll(0, gridData);
 
-      // Restore base color IDs if available
-      if (baseColorIds != null && baseColorIds.length == cols * rows) {
-        sandWorld.baseColorIdBuffer.setAll(0, baseColorIds);
-      }
+  //     // Restore base color IDs if available
+  //     if (baseColorIds != null && baseColorIds.length == cols * rows) {
+  //       sandWorld.baseColorIdBuffer.setAll(0, baseColorIds);
+  //     }
 
-      // Rebuild clusters from the restored grid
-      sandWorld.rebuildClusters(sandWorld);
+  //     // Rebuild clusters from the restored grid
+  //     sandWorld.rebuildClusters(sandWorld);
 
-      // Restore score
-      ScoringService.instance.setScore(score);
+  //     // Restore score
+  //     ScoringService.instance.setScore(score);
 
-      // Generate next piece and reset flags
-      _generateNextPiece();
-      _isGameOverDetected = false;
-      _previousMilestone = 0;
-      _wasStableLastFrame = true;
-      _needsSimulation = false;
-      _accumulator = 0;
-      _placementsSinceLastSave = 0;
-      _hasPendingAutosave = false;
-      _isAutosaveInFlight = false;
-      _cellsToClears.clear();
-      _clearingCellAnimations.clear();
-      _clearingElapsedTime = 0;
-      _clearMask.fillRange(0, _clearMask.length, 0);
-      _syncAllCellColorsFromWorld();
-      _updateVertexPositions();
-    } catch (e) {
-      // Silently fail if load is corrupted
-    }
-  }
+  //     // Generate next piece and reset flags
+  //     _generateNextPiece();
+  //     _isGameOverDetected = false;
+  //     _previousMilestone = 0;
+  //     _wasStableLastFrame = true;
+  //     _needsSimulation = false;
+  //     _accumulator = 0;
+  //     _placementsSinceLastSave = 0;
+  //     _hasPendingAutosave = false;
+  //     _isAutosaveInFlight = false;
+  //     _cellsToClears.clear();
+  //     _clearingCellAnimations.clear();
+  //     _clearingElapsedTime = 0;
+  //     _clearMask.fillRange(0, _clearMask.length, 0);
+  //     _syncAllCellColorsFromWorld();
+  //     _updateVertexPositions();
+  //   } catch (e) {
+  //     // Silently fail if load is corrupted
+  //   }
+  // }
 }
