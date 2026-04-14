@@ -93,6 +93,10 @@ class SandWorld {
   /// Track recently cleared cell indices for animation purposes
   final List<int> lastClearedIndices = [];
 
+  // Only process clusters that might move (saves huge CPU when board is mostly settled)
+  final List<Cluster> _activeClusters = [];
+  bool _activeListDirty = true;
+
   SandWorld({required this.cols, required this.rows})
     : gridColorBuffer = Uint32List(cols * rows),
       baseColorIdBuffer = Uint8List(cols * rows),
@@ -442,15 +446,28 @@ class SandWorld {
   // =========================================================
 
   void _applyClusterPhysics() {
-    // Cache cluster list, rebuild only when cluster count changes
-    if (clusters.length != _lastKnownClusterCount) {
+    if (_activeListDirty || clusters.length != _lastKnownClusterCount) {
       _cachedClusterList = clusters.values.toList();
       _lastKnownClusterCount = clusters.length;
+      _activeListDirty = false;
     }
-    final clusterList = _cachedClusterList;
-    bool anyMovement = false;
 
-    for (final cluster in clusterList) {
+    bool anyMovement = false;
+    _activeClusters.clear();
+
+    for (final cluster in _cachedClusterList) {
+      if (!clusters.containsKey(cluster.id)) continue;
+
+      // Quick reject: single-cell clusters at bottom can't move
+      if (cluster.cells.length == 1) {
+        final cell = cluster.cells.first;
+        if (cell.y >= rows - 1) continue;
+      }
+
+      _activeClusters.add(cluster); // only these will run full physics
+    }
+
+    for (final cluster in _activeClusters) {
       if (!clusters.containsKey(cluster.id)) continue;
 
       if (_tryMoveCluster(cluster, 0, 1)) {
@@ -478,29 +495,27 @@ class SandWorld {
           moved = true;
         }
       }
-
       if (moved) {
         anyMovement = true;
         continue;
       }
 
       if (cluster.cells.length > 1) {
-        final willMoveAsGrains = _wouldAnyGrainMoveIfClusterBreaksApart(cluster);
+        final willMoveAsGrains = _wouldAnyGrainMoveIfClusterBreaksApart(
+          cluster,
+        );
         _breakApartCluster(cluster);
-        if (willMoveAsGrains) {
-          // Only mark the board unstable if the newly created grains could
-          // actually move on the next tick.
-          anyMovement = true;
-        }
+        if (willMoveAsGrains) anyMovement = true;
+        _activeListDirty = true; // breaking apart creates new singles
         continue;
       }
     }
 
     _isStable = !anyMovement;
 
-    // Check for game over condition when board stabilizes
     if (_isStable) {
       _checkGameOverCondition();
+      _activeListDirty = true; // force rebuild next time
     }
   }
 
