@@ -342,8 +342,12 @@ class SandWorld {
   }
 
   void update(double dt) {
-    _applyClusterPhysics();
-    _syncGridFromClusters();
+    final didMutateGrid = _applyClusterPhysics();
+    if (didMutateGrid) {
+      _syncGridFromClusters();
+    } else {
+      _lastDirtyCellCount = 0;
+    }
   }
 
   /// Immediately syncs cluster data into render buffers.
@@ -357,63 +361,80 @@ class SandWorld {
   void mergeAdjacentClusters() {
     if (!_isStable || clusters.isEmpty) return;
 
-    final clustersByColorId = <int, List<Cluster>>{};
-    for (final cluster in clusters.values) {
-      if (cluster.cells.length != 1) continue;
-      final colorId = cluster.cells.first.baseColorId;
-      clustersByColorId.putIfAbsent(colorId, () => []).add(cluster);
+    bool mergedAny = false;
+    _visitStamp++;
+    if (_visitStamp == 0) {
+      _visitStamp = 1;
+      _visitStampBuffer.fillRange(0, _visitStampBuffer.length, 0);
     }
 
-    for (final colorClusters in clustersByColorId.values) {
-      final processed = <int>{};
+    final singletonSeeds = clusters.values
+        .where((c) => c.cells.length == 1)
+        .toList(growable: false);
 
-      for (final cluster in colorClusters) {
-        if (processed.contains(cluster.id)) continue;
+    for (final seed in singletonSeeds) {
+      if (!clusters.containsKey(seed.id) || seed.cells.length != 1) continue;
+
+      final seedCell = seed.cells.first;
+      final seedIdx = seedCell.y * cols + seedCell.x;
+      if (_visitStampBuffer[seedIdx] == _visitStamp) continue;
+
+      final targetColorId = seedCell.baseColorId;
+      _bfsHead = 0;
+      _bfsTail = 0;
+      _bfsQueue[_bfsTail++] = seedIdx;
+
+      final componentIndices = <int>[];
+      final componentClusterIds = <int>[];
+
+      while (_bfsHead < _bfsTail) {
+        final idx = _bfsQueue[_bfsHead++];
+        if (_visitStampBuffer[idx] == _visitStamp) continue;
+
+        final clusterId = cellIdMap[idx];
+        if (clusterId == 0) continue;
+
+        final cluster = clusters[clusterId];
+        if (cluster == null || cluster.cells.length != 1) continue;
 
         final cell = cluster.cells.first;
-        final toMerge = [cluster];
-        processed.add(cluster.id);
+        if (cell.baseColorId != targetColorId) continue;
 
-        final adjacent = [
-          (cell.x - 1, cell.y),
-          (cell.x + 1, cell.y),
-          (cell.x, cell.y - 1),
-          (cell.x, cell.y + 1),
-        ];
+        _visitStampBuffer[idx] = _visitStamp;
+        componentIndices.add(idx);
+        componentClusterIds.add(clusterId);
 
-        for (final (nx, ny) in adjacent) {
-          if (!isInside(nx, ny)) continue;
-          final adjClusterId = cellIdMap[ny * cols + nx];
-          if (adjClusterId == 0 || processed.contains(adjClusterId)) continue;
-          final adjCluster = clusters[adjClusterId];
-          if (adjCluster == null ||
-              adjCluster.cells.length != 1 ||
-              adjCluster.cells.first.baseColorId !=
-                  cluster.cells.first.baseColorId) {
-            continue;
-          }
-          toMerge.add(adjCluster);
-          processed.add(adjClusterId);
-        }
-
-        if (toMerge.length > 1) {
-          final mergedCells = <Cell>[];
-          for (final c in toMerge) {
-            mergedCells.addAll(c.cells);
-            clusters.remove(c.id);
-            for (final cell in c.cells) {
-              cellIdMap[cell.y * cols + cell.x] = 0;
-            }
-          }
-
-          final newClusterId = _nextClusterId++;
-          final mergedCluster = Cluster(id: newClusterId, cells: mergedCells);
-          clusters[newClusterId] = mergedCluster;
-          for (final cell in mergedCells) {
-            cellIdMap[cell.y * cols + cell.x] = newClusterId;
-          }
-        }
+        final x = idx % cols;
+        final y = idx ~/ cols;
+        if (x > 0) _bfsQueue[_bfsTail++] = idx - 1;
+        if (x < cols - 1) _bfsQueue[_bfsTail++] = idx + 1;
+        if (y > 0) _bfsQueue[_bfsTail++] = idx - cols;
+        if (y < rows - 1) _bfsQueue[_bfsTail++] = idx + cols;
       }
+
+      if (componentClusterIds.length <= 1) continue;
+
+      final mergedCells = <Cell>[];
+      for (final clusterId in componentClusterIds) {
+        final existing = clusters.remove(clusterId);
+        if (existing == null || existing.cells.isEmpty) continue;
+        mergedCells.add(existing.cells.first);
+      }
+
+      if (mergedCells.length <= 1) continue;
+
+      final mergedId = _nextClusterId++;
+      clusters[mergedId] = Cluster(id: mergedId, cells: mergedCells);
+      for (final idx in componentIndices) {
+        cellIdMap[idx] = mergedId;
+      }
+      mergedAny = true;
+    }
+
+    if (mergedAny) {
+      _activeListDirty = true;
+      _cachedClusterList = clusters.values.toList(growable: false);
+      _lastKnownClusterCount = clusters.length;
     }
   }
 
@@ -445,7 +466,7 @@ class SandWorld {
   // PHYSICS (CLUSTER-BASED GRAVITY)
   // =========================================================
 
-  void _applyClusterPhysics() {
+  bool _applyClusterPhysics() {
     if (_activeListDirty || clusters.length != _lastKnownClusterCount) {
       _cachedClusterList = clusters.values.toList();
       _lastKnownClusterCount = clusters.length;
@@ -504,9 +525,12 @@ class SandWorld {
         final willMoveAsGrains = _wouldAnyGrainMoveIfClusterBreaksApart(
           cluster,
         );
-        _breakApartCluster(cluster);
-        if (willMoveAsGrains) anyMovement = true;
-        _activeListDirty = true; // breaking apart creates new singles
+        // Avoid fragmenting stable structures into thousands of singletons.
+        if (willMoveAsGrains) {
+          _breakApartCluster(cluster);
+          anyMovement = true;
+          _activeListDirty = true; // breaking apart creates new singles
+        }
         continue;
       }
     }
@@ -517,6 +541,8 @@ class SandWorld {
       _checkGameOverCondition();
       _activeListDirty = true; // force rebuild next time
     }
+
+    return anyMovement;
   }
 
   /// Checks if sand has reached the top threshold (top 10% of grid).
@@ -815,19 +841,27 @@ class SandWorld {
   void _cleanupStaleClusters() {
     final idsToRemove = <int>[];
     for (final entry in clusters.entries) {
+      final clusterId = entry.key;
       final cluster = entry.value;
-      bool stillValid = false;
-      for (final cell in cluster.cells) {
-        if (cellIdMap[cell.y * cols + cell.x] == entry.key) {
-          stillValid = true;
-          break;
-        }
+
+      cluster.cells.removeWhere((cell) {
+        if (!isInside(cell.x, cell.y)) return true;
+        return cellIdMap[cell.y * cols + cell.x] != clusterId;
+      });
+
+      if (cluster.cells.isEmpty) {
+        idsToRemove.add(clusterId);
       }
-      if (!stillValid) idsToRemove.add(entry.key);
     }
-    for (final id in idsToRemove) {
-      clusters.remove(id);
+
+    if (idsToRemove.isNotEmpty) {
+      for (final id in idsToRemove) {
+        clusters.remove(id);
+      }
+      _lastKnownClusterCount = clusters.length;
     }
+
+    _activeListDirty = true;
   }
 
   bool _isClusterSupportedAfterMove(Cluster cluster, int dx, int dy) {

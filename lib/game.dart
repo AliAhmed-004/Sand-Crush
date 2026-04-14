@@ -51,7 +51,7 @@ class SandGame extends FlameGame with TapCallbacks {
   double _accumulator = 0;
   static const double _step = 1 / 60;
   static const double _maxFrameDt = 0.05;
-  static const int _maxSubStepsPerFrame = 4;
+  static const int _maxSubStepsPerFrame = 2;
 
   // Track stability to trigger bridge checks only when the board transitions from unstable to stable
   bool _wasStableLastFrame = true;
@@ -60,10 +60,16 @@ class SandGame extends FlameGame with TapCallbacks {
   // Debounced save frequency: save game state only after every N successful placements
   static const int _saveInterval = 5;
   int _placementsSinceLastSave = 0;
+  bool _hasPendingAutosave = false;
+  bool _isAutosaveInFlight = false;
 
   // Next piece preview
   late List<Point<int>> nextShape;
   late Color nextColor;
+  int _nextShapeMinX = 0;
+  int _nextShapeMaxX = 0;
+  int _nextShapeMinY = 0;
+  int _nextShapeMaxY = 0;
 
   // Preview UI settings
   final double previewSize = 120.0; // size of the preview box in pixels
@@ -98,7 +104,7 @@ class SandGame extends FlameGame with TapCallbacks {
   // Cached Vertices for massive render speedup
   Vertices? _cachedVertices;
   bool _needsVertexUpdate = true;
-
+  final Paint _verticesPaint = Paint();
 
   @override
   Future<void> onLoad() async {
@@ -138,6 +144,26 @@ class SandGame extends FlameGame with TapCallbacks {
 
   void _generateNextPiece() {
     nextShape = _randomShape();
+
+    if (nextShape.isNotEmpty) {
+      int minX = nextShape.first.x;
+      int maxX = nextShape.first.x;
+      int minY = nextShape.first.y;
+      int maxY = nextShape.first.y;
+
+      for (final p in nextShape) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+
+      _nextShapeMinX = minX;
+      _nextShapeMaxX = maxX;
+      _nextShapeMinY = minY;
+      _nextShapeMaxY = maxY;
+    }
+
     // Get available colors based on current difficulty
     final currentScore = ScoringService.instance.currentScore;
     final availableColors = DifficultyService.instance.getAvailableColors(
@@ -268,17 +294,8 @@ class SandGame extends FlameGame with TapCallbacks {
       // Debounced save: only save every N placements
       _placementsSinceLastSave++;
       if (_placementsSinceLastSave >= _saveInterval) {
-        final gameStateDTO = GameStateDTO(
-          cols: sandWorld.cols,
-          rows: sandWorld.rows,
-          grid: sandWorld.gridColorBuffer.toList(),
-          baseColorIds: sandWorld.baseColorIdBuffer.toList(),
-        );
-        SaveGameService.instance.saveGame(
-          gameStateDTO,
-          ScoringService.instance.currentScore,
-        );
         _placementsSinceLastSave = 0;
+        _hasPendingAutosave = true;
       }
     }
   }
@@ -420,7 +437,31 @@ class SandGame extends FlameGame with TapCallbacks {
       ScoringService.instance.endClearSessionIfNoBridges(anyBridgesCleared);
     }
 
+    if (_hasPendingAutosave && sandWorld.isStable && !_needsSimulation) {
+      _triggerAutosave();
+    }
+
     _wasStableLastFrame = sandWorld.isStable;
+  }
+
+  void _triggerAutosave() {
+    if (_isAutosaveInFlight) return;
+
+    _isAutosaveInFlight = true;
+    _hasPendingAutosave = false;
+
+    final gameStateDTO = GameStateDTO(
+      cols: sandWorld.cols,
+      rows: sandWorld.rows,
+      grid: sandWorld.gridColorBuffer.toList(growable: false),
+      baseColorIds: sandWorld.baseColorIdBuffer.toList(growable: false),
+    );
+
+    SaveGameService.instance
+        .saveGame(gameStateDTO, ScoringService.instance.currentScore)
+        .whenComplete(() {
+          _isAutosaveInFlight = false;
+        });
   }
 
   // =========================================================
@@ -438,9 +479,7 @@ class SandGame extends FlameGame with TapCallbacks {
         Offset(0, 0),
         Offset(0, size.y),
         [
-          SandColors.deepSand.withAlpha(
-            int.parse('4d', radix: 16),
-          ), // 30% opacity
+          SandColors.deepSand.withAlpha(0x4D), // 30% opacity
           SandColors.darkBg,
         ],
         [0.0, 0.7],
@@ -470,7 +509,7 @@ class SandGame extends FlameGame with TapCallbacks {
       _needsVertexUpdate = false;
     }
 
-    canvas.drawVertices(_cachedVertices!, BlendMode.src, Paint());
+    canvas.drawVertices(_cachedVertices!, BlendMode.src, _verticesPaint);
 
     _drawGridLines(canvas);
     _drawGameOverThreshold(canvas);
@@ -662,23 +701,20 @@ class SandGame extends FlameGame with TapCallbacks {
 
     final previewCellSize = cellSize;
 
-    final minX = nextShape.map((p) => p.x).reduce((a, b) => a < b ? a : b);
-    final maxX = nextShape.map((p) => p.x).reduce((a, b) => a > b ? a : b);
-    final minY = nextShape.map((p) => p.y).reduce((a, b) => a < b ? a : b);
-    final maxY = nextShape.map((p) => p.y).reduce((a, b) => a > b ? a : b);
-
-    final shapeWidth = maxX - minX + 1;
-    final shapeHeight = maxY - minY + 1;
+    final shapeWidth = _nextShapeMaxX - _nextShapeMinX + 1;
+    final shapeHeight = _nextShapeMaxY - _nextShapeMinY + 1;
 
     final totalShapeWidth = shapeWidth * previewCellSize;
     final totalShapeHeight = shapeHeight * previewCellSize;
 
     final offsetX =
-        previewX + (previewSize - totalShapeWidth) / 2 - minX * previewCellSize;
+        previewX +
+        (previewSize - totalShapeWidth) / 2 -
+        _nextShapeMinX * previewCellSize;
     final offsetY =
         previewY +
         (previewSize - totalShapeHeight) / 2 -
-        minY * previewCellSize;
+        _nextShapeMinY * previewCellSize;
 
     final paint = Paint()..color = nextColor;
 
@@ -707,6 +743,8 @@ class SandGame extends FlameGame with TapCallbacks {
     _needsSimulation = false;
     _accumulator = 0;
     _placementsSinceLastSave = 0;
+    _hasPendingAutosave = false;
+    _isAutosaveInFlight = false;
     _cellsToClears.clear();
     _clearingCellAnimations.clear();
     _clearingElapsedTime = 0;
@@ -765,6 +803,8 @@ class SandGame extends FlameGame with TapCallbacks {
       _needsSimulation = false;
       _accumulator = 0;
       _placementsSinceLastSave = 0;
+      _hasPendingAutosave = false;
+      _isAutosaveInFlight = false;
       _cellsToClears.clear();
       _clearingCellAnimations.clear();
       _clearingElapsedTime = 0;
