@@ -26,24 +26,30 @@ class _SandParticle {
     // Start from random position around the title
     x = centerX + ((_random.nextDouble() - 0.5) * width * 0.8);
     y = centerY - (_random.nextDouble() * 40 + 20);
-    
+
     // Gentle horizontal drift
     vx = (_random.nextDouble() - 0.5) * 40;
-    
+
     // Falling velocity
     vy = _random.nextDouble() * 30 + 50;
-    
+
     opacity = _random.nextDouble() * 0.7 + 0.3;
     scale = _random.nextDouble() * 0.6 + 0.4;
   }
 
-  void update(double dt, double centerX, double centerY, double width, double height) {
+  void update(
+    double dt,
+    double centerX,
+    double centerY,
+    double width,
+    double height,
+  ) {
     x += vx * dt;
     y += vy * dt;
-    
+
     // Fade out as it falls
     opacity -= dt * 0.3;
-    
+
     // Reset if it goes off screen
     if (y > height || opacity <= 0) {
       reset(centerX, centerY, width);
@@ -52,7 +58,7 @@ class _SandParticle {
 
   void paint(Canvas canvas, double size) {
     if (opacity <= 0) return;
-    
+
     canvas.drawCircle(
       Offset(x, y),
       size * scale,
@@ -125,8 +131,8 @@ class _MainMenuOverlayState extends State<MainMenuOverlay>
   @override
   Widget build(BuildContext context) {
     final highScore = HighScoreService.instance.getHighScore();
-    // final hasSavedGame = SaveGameService.instance.hasSavedGame();
-    // final savedScore = SaveGameService.instance.getSavedScore();
+    final hasSavedGame = SaveGameService.instance.hasSavedGame();
+    final savedScore = SaveGameService.instance.getSavedScore();
 
     return Material(
       child: Container(
@@ -134,10 +140,7 @@ class _MainMenuOverlayState extends State<MainMenuOverlay>
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              SandColors.darkBg,
-              SandColors.mediumBg,
-            ],
+            colors: [SandColors.darkBg, SandColors.mediumBg],
           ),
         ),
         child: FadeTransition(
@@ -238,31 +241,33 @@ class _MainMenuOverlayState extends State<MainMenuOverlay>
                   // Buttons section
                   Column(
                     children: [
-                      // if (hasSavedGame) ...[
-                      //   _MenuButton(
-                      //     label: 'Continue Game - Score: $savedScore',
-                      //     onPressed: () {
-                      //       widget.game.loadSavedGame();
-                      //       widget.game.isGameStarted = true;
-                      //       widget.game.resumeEngine();
-                      //       widget.game.overlays
-                      //           .remove(GameConfig.mainMenuOverlay);
-                      //       widget.game.overlays.add(GameConfig.hudOverlay);
-                      //     },
-                      //     color: SandColors.warmAccent,
-                      //   ),
-                      //   const SizedBox(height: 12),
-                      // ],
+                      if (hasSavedGame) ...[
+                        _MenuButton(
+                          label: 'Continue Game - Score: $savedScore',
+                          onPressed: () {
+                            widget.game.loadSavedGame();
+                            widget.game.isGameStarted = true;
+                            widget.game.resumeEngine();
+                            widget.game.overlays.remove(
+                              GameConfig.mainMenuOverlay,
+                            );
+                            widget.game.overlays.add(GameConfig.hudOverlay);
+                          },
+                          color: SandColors.warmAccent,
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       _MenuButton(
                         label: 'Start New Game',
                         onPressed: () {
-                          // SaveGameService.instance.deleteSavedGame();
+                          SaveGameService.instance.deleteSavedGame();
                           widget.game.resetGameState();
                           ScoringService.instance.resetScore();
                           widget.game.isGameStarted = true;
                           widget.game.resumeEngine();
-                          widget.game.overlays
-                              .remove(GameConfig.mainMenuOverlay);
+                          widget.game.overlays.remove(
+                            GameConfig.mainMenuOverlay,
+                          );
                           widget.game.overlays.add(GameConfig.hudOverlay);
                         },
                         color: SandColors.warmAccent,
@@ -322,10 +327,7 @@ class _MenuButtonState extends State<_MenuButton> {
             ),
             child: Text(
               widget.label,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
         ),

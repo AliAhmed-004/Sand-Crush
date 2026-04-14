@@ -446,9 +446,9 @@ class SandGame extends FlameGame with TapCallbacks {
       ScoringService.instance.endClearSessionIfNoBridges(anyBridgesCleared);
     }
 
-    // if (_hasPendingAutosave && sandWorld.isStable && !_needsSimulation) {
-    //   _triggerAutosave();
-    // }
+    if (_hasPendingAutosave && sandWorld.isStable && !_needsSimulation) {
+      _triggerAutosave();
+    }
 
     _wasStableLastFrame = sandWorld.isStable;
   }
@@ -459,18 +459,13 @@ class SandGame extends FlameGame with TapCallbacks {
     _isAutosaveInFlight = true;
     _hasPendingAutosave = false;
 
-    final gameStateDTO = GameStateDTO(
-      cols: sandWorld.cols,
-      rows: sandWorld.rows,
-      grid: sandWorld.gridColorBuffer.toList(growable: false),
-      baseColorIds: sandWorld.baseColorIdBuffer.toList(growable: false),
-    );
+    final sparseState = SparseGameStateDTO.fromWorld(sandWorld);
 
-    // SaveGameService.instance
-    //     .saveGame(gameStateDTO, ScoringService.instance.currentScore)
-    //     .whenComplete(() {
-    //       _isAutosaveInFlight = false;
-    //     });
+    SaveGameService.instance
+        .saveGame(sparseState, ScoringService.instance.currentScore)
+        .whenComplete(() {
+          _isAutosaveInFlight = false;
+        });
   }
 
   // =========================================================
@@ -512,7 +507,7 @@ class SandGame extends FlameGame with TapCallbacks {
     // drawn every frame even if their picture generation is memoized.
     _drawGridLines(canvas);
     _drawGameOverThreshold(canvas);
-    
+
     _drawNextPiecePreview(canvas);
   }
 
@@ -780,63 +775,51 @@ class SandGame extends FlameGame with TapCallbacks {
     _cachedVertices = null;
   }
 
-  /// Loads a saved game state and rebuilds the world from the saved grid.
-  // void loadSavedGame() {
-  //   // final saveService = SaveGameService.instance;
-  //   // final savedData = saveService.loadGame();
+  /// Loads a saved game state and rebuilds the world from the saved sparse grid.
+  void loadSavedGame() {
+    final savedData = SaveGameService.instance.loadGame();
 
-  //   if (savedData == null) {
-  //     return;
-  //   }
+    if (savedData == null) {
+      return;
+    }
 
-  //   try {
-  //     // Restore the grid data
-  //     final cols = savedData['cols'] as int;
-  //     final rows = savedData['rows'] as int;
-  //     final gridList = savedData['grid'] as List;
-  //     final gridData = List<int>.from(gridList);
-  //     final baseColorIdsList = savedData['baseColorIds'] as List?;
-  //     final baseColorIds = baseColorIdsList != null
-  //         ? List<int>.from(baseColorIdsList)
-  //         : null;
-  //     final score = savedData['score'] as int;
+    try {
+      final sparseState = savedData['state'] as SparseGameStateDTO;
+      final score = savedData['score'] as int;
 
-  //     // Reset world and restore grid
-  //     sandWorld = SandWorld(cols: cols, rows: rows);
-  //     if (_clearMask.length != cols * rows) {
-  //       _clearMask = Uint8List(cols * rows);
-  //     }
-  //     sandWorld.gridColorBuffer.setAll(0, gridData);
+      // Reset world with correct dimensions
+      sandWorld = SandWorld(cols: cols, rows: rows);
+      if (_clearMask.length != cols * rows) {
+        _clearMask = Uint8List(cols * rows);
+      }
 
-  //     // Restore base color IDs if available
-  //     if (baseColorIds != null && baseColorIds.length == cols * rows) {
-  //       sandWorld.baseColorIdBuffer.setAll(0, baseColorIds);
-  //     }
+      // Apply sparse state to world (reconstructs full grid)
+      sparseState.applyToWorld(sandWorld);
 
-  //     // Rebuild clusters from the restored grid
-  //     sandWorld.rebuildClusters(sandWorld);
+      // Rebuild clusters from the restored grid
+      sandWorld.rebuildClusters(sandWorld);
 
-  //     // Restore score
-  //     ScoringService.instance.setScore(score);
+      // Restore score
+      ScoringService.instance.setScore(score);
 
-  //     // Generate next piece and reset flags
-  //     _generateNextPiece();
-  //     _isGameOverDetected = false;
-  //     _previousMilestone = 0;
-  //     _wasStableLastFrame = true;
-  //     _needsSimulation = false;
-  //     _accumulator = 0;
-  //     _placementsSinceLastSave = 0;
-  //     _hasPendingAutosave = false;
-  //     _isAutosaveInFlight = false;
-  //     _cellsToClears.clear();
-  //     _clearingCellAnimations.clear();
-  //     _clearingElapsedTime = 0;
-  //     _clearMask.fillRange(0, _clearMask.length, 0);
-  //     _syncAllCellColorsFromWorld();
-  //     _updateVertexPositions();
-  //   } catch (e) {
-  //     // Silently fail if load is corrupted
-  //   }
-  // }
+      // Generate next piece and reset flags
+      _generateNextPiece();
+      _isGameOverDetected = false;
+      _previousMilestone = 0;
+      _wasStableLastFrame = true;
+      _needsSimulation = false;
+      _accumulator = 0;
+      _placementsSinceLastSave = 0;
+      _hasPendingAutosave = false;
+      _isAutosaveInFlight = false;
+      _cellsToClears.clear();
+      _clearingCellAnimations.clear();
+      _clearingElapsedTime = 0;
+      _clearMask.fillRange(0, _clearMask.length, 0);
+      _syncAllCellColorsFromWorld();
+      _updateVertexPositions();
+    } catch (e) {
+      // Silently fail if load is corrupted
+    }
+  }
 }

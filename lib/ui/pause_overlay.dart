@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
 import 'package:sand_crush/game.dart';
-import 'package:sand_crush/services/save_game_service.dart';
 import 'package:sand_crush/theme/theme.dart';
 
 /// Pause overlay for the Sand Crush game.
