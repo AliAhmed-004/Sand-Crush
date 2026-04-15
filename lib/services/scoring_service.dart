@@ -12,14 +12,17 @@ class ScoringService {
   final int _basePoints = 25;
 
   // Total score notifier
-  final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(24900);
+  final ValueNotifier<int> _scoreNotifier = ValueNotifier<int>(0);
 
   // Combo tracking for pile clears
   int _currentComboCount = 0;
   bool _isInComboSession = false;
+  int _lastClearPoints = 0;
 
   int get currentScore => _scoreNotifier.value;
   ValueNotifier<int> get scoreNotifier => _scoreNotifier;
+  int get blockPlacementPoints => _basePoints;
+  int get lastClearPoints => _lastClearPoints;
 
   // Singleton pattern
   static final ScoringService _instance = ScoringService._internal();
@@ -56,6 +59,7 @@ class ScoringService {
 
     int points = (_basePoints * multiplier * comboBonus).toInt();
     _scoreNotifier.value += points;
+    _lastClearPoints = points;
 
     _currentComboCount++;
   }
@@ -75,6 +79,7 @@ class ScoringService {
     _scoreNotifier.value = 0;
     _currentComboCount = 0;
     _isInComboSession = false;
+    _lastClearPoints = 0;
   }
 
   /// Method to set the score, typically called when loading a saved game
@@ -82,5 +87,6 @@ class ScoringService {
     _scoreNotifier.value = score;
     _currentComboCount = 0;
     _isInComboSession = false;
+    _lastClearPoints = 0;
   }
 }

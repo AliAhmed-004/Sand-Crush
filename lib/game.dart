@@ -8,6 +8,7 @@ import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
+import 'package:sand_crush/models/floating_score.dart';
 import 'package:sand_crush/models/game_state_dto.dart';
 import 'package:sand_crush/services/difficulty_service.dart';
 import 'package:sand_crush/services/high_score_service.dart';
@@ -110,6 +111,15 @@ class SandGame extends FlameGame with TapCallbacks {
   Vertices? _cachedVertices;
   bool _needsVertexUpdate = true;
   final Paint _verticesPaint = Paint();
+
+  // Floating score popup (single instance, reused)
+  FloatingScore? _activeFloatingScore;
+
+  // Screen shake
+  double _shakeIntensity = 0;
+  double _shakeElapsed = 0;
+  static const double _shakeDuration = 0.15;
+  Offset _shakeOffset = Offset.zero;
 
   @override
   Future<void> onLoad() async {
@@ -300,6 +310,15 @@ class SandGame extends FlameGame with TapCallbacks {
       sandWorld.syncGridNow();
       _applyWorldDirtyCellColors();
 
+      // Show floating score popup at tap position
+      final screenX = gridOffset.dx + gridX * cellSize + cellSize / 2;
+      final screenY = gridOffset.dy + gridY * cellSize;
+      _activeFloatingScore = FloatingScore(
+        value: ScoringService.instance.blockPlacementPoints,
+        startPosition: Offset(screenX, screenY),
+        type: FloatingScoreType.tap,
+      );
+
       // Debounced save: only save every N placements
       _placementsSinceLastSave++;
       if (_placementsSinceLastSave >= _saveInterval) {
@@ -439,6 +458,17 @@ class SandGame extends FlameGame with TapCallbacks {
       // Start one clear animation for all cleared bridges.
       if (indicesToClear.isNotEmpty) {
         _startClearingAnimation(indicesToClear.toList());
+
+        // Show combo floating score and trigger screen shake
+        final screenX = gridOffset.dx + (cols * cellSize) / 2;
+        final screenY = gridOffset.dy + (rows * cellSize) / 3;
+        _activeFloatingScore = FloatingScore(
+          value: ScoringService.instance.lastClearPoints,
+          startPosition: Offset(screenX, screenY),
+          type: FloatingScoreType.combo,
+        );
+        _shakeIntensity = 4;
+        _shakeElapsed = 0;
       }
 
       // Only end combo if no bridges were found
@@ -448,6 +478,31 @@ class SandGame extends FlameGame with TapCallbacks {
 
     if (_hasPendingAutosave && sandWorld.isStable && !_needsSimulation) {
       _triggerAutosave();
+    }
+
+    // Update floating score popup
+    if (_activeFloatingScore != null) {
+      _activeFloatingScore!.update(dt);
+      if (_activeFloatingScore!.isExpired) {
+        _activeFloatingScore = null;
+      }
+    }
+
+    // Update screen shake
+    if (_shakeIntensity > 0) {
+      _shakeElapsed += dt;
+      if (_shakeElapsed >= _shakeDuration) {
+        _shakeIntensity = 0;
+        _shakeElapsed = 0;
+        _shakeOffset = Offset.zero;
+      } else {
+        final progress = _shakeElapsed / _shakeDuration;
+        final currentIntensity = _shakeIntensity * (1.0 - progress);
+        _shakeOffset = Offset(
+          (_random.nextDouble() * 2 - 1) * currentIntensity,
+          (_random.nextDouble() * 2 - 1) * currentIntensity,
+        );
+      }
     }
 
     _wasStableLastFrame = sandWorld.isStable;
@@ -475,6 +530,10 @@ class SandGame extends FlameGame with TapCallbacks {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
+
+    // Apply screen shake
+    canvas.save();
+    canvas.translate(_shakeOffset.dx, _shakeOffset.dy);
 
     _drawBackground(canvas);
 
@@ -509,6 +568,13 @@ class SandGame extends FlameGame with TapCallbacks {
     _drawGameOverThreshold(canvas);
 
     _drawNextPiecePreview(canvas);
+
+    // Draw floating score popup
+    if (_activeFloatingScore != null) {
+      _drawFloatingScore(canvas);
+    }
+
+    canvas.restore();
   }
 
   void _startClearingAnimation(List<int> cellIndices) {
@@ -751,6 +817,46 @@ class SandGame extends FlameGame with TapCallbacks {
     }
   }
 
+  void _drawFloatingScore(Canvas canvas) {
+    final fs = _activeFloatingScore!;
+    final pos = fs.currentPosition;
+    final alpha = fs.alpha;
+    final scale = fs.scale;
+
+    // Color: white for tap, gold for combo
+    final color = fs.type == FloatingScoreType.tap
+        ? Colors.white.withAlpha((255 * alpha).toInt())
+        : Colors.amber.withAlpha((255 * alpha).toInt());
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: '+${fs.value}',
+        style: TextStyle(
+          color: color,
+          fontSize: fs.fontSize * scale,
+          fontWeight: FontWeight.bold,
+          shadows: [
+            Shadow(
+              color: Colors.black.withAlpha((128 * alpha).toInt()),
+              blurRadius: 4,
+              offset: const Offset(1, 1),
+            ),
+          ],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+
+    textPainter.paint(
+      canvas,
+      Offset(
+        pos.dx - textPainter.width / 2,
+        pos.dy - textPainter.height / 2,
+      ),
+    );
+  }
+
   /// Resets game state for a new game. Clears the board and resets all game flags.
   void resetGameState() {
     sandWorld = SandWorld(cols: cols, rows: rows);
@@ -773,6 +879,10 @@ class SandGame extends FlameGame with TapCallbacks {
 
     _needsVertexUpdate = true;
     _cachedVertices = null;
+    _activeFloatingScore = null;
+    _shakeIntensity = 0;
+    _shakeElapsed = 0;
+    _shakeOffset = Offset.zero;
   }
 
   /// Loads a saved game state and rebuilds the world from the saved sparse grid.
