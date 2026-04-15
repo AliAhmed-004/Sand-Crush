@@ -6,18 +6,18 @@
     "configurations": [
     
         {
-            "name": "sand_crush",
+            "name": "sandfall",
             "request": "launch",
             "type": "dart"
         },
         {
-            "name": "sand_crush (profile mode)",
+            "name": "sandfall (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "sand_crush (release mode)",
+            "name": "sandfall (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"

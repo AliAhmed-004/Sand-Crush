@@ -1,4 +1,4 @@
-package com.spudbyte.sand_crush
+package com.spudbyte.sandfall
 
 import io.flutter.embedding.android.FlutterActivity
 

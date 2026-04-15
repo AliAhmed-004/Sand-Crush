@@ -16,7 +16,7 @@ if (keyPropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.spudbyte.sand_crush"
+    namespace = "com.spudbyte.sandfall"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
     signingConfigs {
@@ -41,7 +41,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.spudbyte.sand_crush"
+        applicationId = "com.spudbyte.sandfall"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
