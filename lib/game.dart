@@ -443,8 +443,8 @@ class SandGame extends FlameGame with TapCallbacks {
       // Emit confetti from progress bar area (top portion of game)
       final progressBarY = size.y * topUIRatio / 2;
       final progressBarCenter = Offset(size.x / 2, progressBarY);
-      final unlockedColor = SandGame.colors[
-          (currentMilestone - 1).clamp(0, SandGame.colors.length - 1)];
+      final unlockedColor = SandGame
+          .colors[(currentMilestone - 1).clamp(0, SandGame.colors.length - 1)];
 
       _confettiEmitter.emit(
         origin: progressBarCenter,
@@ -459,8 +459,9 @@ class SandGame extends FlameGame with TapCallbacks {
       _activeBadge = NotificationBadge(
         milestone: currentMilestone,
         unlockedColor: unlockedColor,
-        nextMilestoneScore:
-            MilestoneService.instance.getNextMilestoneScore(currentScore),
+        nextMilestoneScore: MilestoneService.instance.getNextMilestoneScore(
+          currentScore,
+        ),
         targetPosition: Offset(size.x / 2, badgeY),
       );
     }
@@ -964,7 +965,7 @@ class SandGame extends FlameGame with TapCallbacks {
       // Generate next piece and reset flags
       _generateNextPiece();
       _isGameOverDetected = false;
-      _previousMilestone = 0;
+      _previousMilestone = MilestoneService.instance.getCurrentMilestone(score);
       _wasStableLastFrame = true;
       _needsSimulation = false;
       _accumulator = 0;
