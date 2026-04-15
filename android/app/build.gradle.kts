@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -5,10 +8,32 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val keyProperties = Properties()
+val keyPropertiesFile = rootProject.file("key.properties")
+
+if (keyPropertiesFile.exists()) {
+  keyProperties.load(FileInputStream(keyPropertiesFile))
+}
+
 android {
     namespace = "com.spudbyte.sand_crush"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+    signingConfigs {
+        create("release") {
+            val storeFilePath = keyProperties["storeFile"] as String
+
+            println("KEY FILE EXISTS: ${keyPropertiesFile.exists()}")
+            println("STORE FILE PATH: $storeFilePath")
+            println("RESOLVED PATH: ${file(storeFilePath).absolutePath}")
+            println("FILE EXISTS: ${file(storeFilePath).exists()}")
+
+            storeFile = file(storeFilePath)
+            storePassword = keyProperties["storePassword"] as String
+            keyAlias = keyProperties["keyAlias"] as String
+            keyPassword = keyProperties["keyPassword"] as String
+        }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -31,10 +56,10 @@ android {
     }
 
     buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 }
