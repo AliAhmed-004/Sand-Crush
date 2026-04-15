@@ -5,9 +5,8 @@ import 'package:sand_crush/services/milestone_service.dart';
 import 'package:sand_crush/services/scoring_service.dart';
 import 'package:sand_crush/theme/theme.dart';
 
-
 /// HUD overlay for the Sand Crush game, showing score, progress, and pause button.
-/// 
+///
 /// Horizontal layout: Score (left) • Progress Bar (center) • Pause Button (right)
 class HudOverlay extends StatefulWidget {
   final SandGame game;
@@ -154,7 +153,7 @@ class _HudOverlayState extends State<HudOverlay>
     final formattedScore = _formatScore(score);
 
     return Positioned(
-      top: 20,
+      top: 50,
       left: 20,
       right: 20,
       child: Material(
@@ -198,7 +197,9 @@ class _HudOverlayState extends State<HudOverlay>
                       child: Container(
                         height: 20,
                         decoration: BoxDecoration(
-                          color: SandColors.sandyBeige.withAlpha(51), // 20% opacity
+                          color: SandColors.sandyBeige.withAlpha(
+                            51,
+                          ), // 20% opacity
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
                             color: SandColors.deepSand,
@@ -209,7 +210,11 @@ class _HudOverlayState extends State<HudOverlay>
                           value: progress,
                           backgroundColor: Colors.transparent,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Color.lerp(SandColors.lightSand, SandColors.warmAccent, progress)!,
+                            Color.lerp(
+                              SandColors.lightSand,
+                              SandColors.warmAccent,
+                              progress,
+                            )!,
                           ),
                           minHeight: 20,
                         ),
@@ -232,7 +237,9 @@ class _HudOverlayState extends State<HudOverlay>
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: SandColors.warmAccent.withAlpha(51), // 20% opacity
+                        color: SandColors.warmAccent.withAlpha(
+                          51,
+                        ), // 20% opacity
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: SandColors.primaryGold,

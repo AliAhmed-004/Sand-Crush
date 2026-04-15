@@ -850,10 +850,7 @@ class SandGame extends FlameGame with TapCallbacks {
 
     textPainter.paint(
       canvas,
-      Offset(
-        pos.dx - textPainter.width / 2,
-        pos.dy - textPainter.height / 2,
-      ),
+      Offset(pos.dx - textPainter.width / 2, pos.dy - textPainter.height / 2),
     );
   }
 
