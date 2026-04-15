@@ -23,11 +23,6 @@ android {
         create("release") {
             val storeFilePath = keyProperties["storeFile"] as String
 
-            println("KEY FILE EXISTS: ${keyPropertiesFile.exists()}")
-            println("STORE FILE PATH: $storeFilePath")
-            println("RESOLVED PATH: ${file(storeFilePath).absolutePath}")
-            println("FILE EXISTS: ${file(storeFilePath).exists()}")
-
             storeFile = file(storeFilePath)
             storePassword = keyProperties["storePassword"] as String
             keyAlias = keyProperties["keyAlias"] as String
