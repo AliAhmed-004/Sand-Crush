@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sand_crush/services/milestone_service.dart';
+import 'package:sandfall/services/milestone_service.dart';
 
 /// A service to manage the difficulty settings of the game.
 /// 

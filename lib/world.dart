@@ -2,7 +2,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:sand_crush/services/scoring_service.dart';
+import 'package:sandfall/services/scoring_service.dart';
 
 /// -----------------------------
 /// CELL MODEL

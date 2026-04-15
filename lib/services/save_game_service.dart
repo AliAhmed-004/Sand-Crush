@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:hive/hive.dart';
-import 'package:sand_crush/config/game_config.dart';
-import 'package:sand_crush/models/game_state_dto.dart';
+import 'package:sandfall/config/game_config.dart';
+import 'package:sandfall/models/game_state_dto.dart';
 
 /// Service responsible for saving and loading the game state from Hive storage.
 ///

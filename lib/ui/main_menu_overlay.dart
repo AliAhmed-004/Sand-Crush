@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:sand_crush/config/game_config.dart';
-import 'package:sand_crush/game.dart';
-import 'package:sand_crush/services/high_score_service.dart';
-import 'package:sand_crush/services/save_game_service.dart';
-import 'package:sand_crush/services/scoring_service.dart';
-import 'package:sand_crush/theme/theme.dart';
+import 'package:sandfall/config/game_config.dart';
+import 'package:sandfall/game.dart';
+import 'package:sandfall/services/high_score_service.dart';
+import 'package:sandfall/services/save_game_service.dart';
+import 'package:sandfall/services/scoring_service.dart';
+import 'package:sandfall/theme/theme.dart';
 
 /// Sand particle for animation
 class _SandParticle {

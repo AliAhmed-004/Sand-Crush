@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sand_crush/world.dart';
+import 'package:sandfall/world.dart';
 
 /// Data Transfer Object for the game state, used for saving and loading the game.
 class GameStateDTO {
