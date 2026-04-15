@@ -8,8 +8,10 @@ import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:sand_crush/config/game_config.dart';
+import 'package:sand_crush/models/confetti_particle.dart';
 import 'package:sand_crush/models/floating_score.dart';
 import 'package:sand_crush/models/game_state_dto.dart';
+import 'package:sand_crush/models/notification_badge.dart';
 import 'package:sand_crush/services/difficulty_service.dart';
 import 'package:sand_crush/services/high_score_service.dart';
 import 'package:sand_crush/services/milestone_service.dart';
@@ -120,6 +122,12 @@ class SandGame extends FlameGame with TapCallbacks {
   double _shakeElapsed = 0;
   static const double _shakeDuration = 0.15;
   Offset _shakeOffset = Offset.zero;
+
+  // Confetti burst emitter
+  final ConfettiEmitter _confettiEmitter = ConfettiEmitter();
+
+  // Notification badge for milestone celebrations
+  NotificationBadge? _activeBadge;
 
   @override
   Future<void> onLoad() async {
@@ -430,8 +438,31 @@ class SandGame extends FlameGame with TapCallbacks {
       currentScore,
     );
     if (currentMilestone > _previousMilestone && isGameStarted) {
-      overlays.add(GameConfig.celebrationOverlay);
       _previousMilestone = currentMilestone;
+
+      // Emit confetti from progress bar area (top portion of game)
+      final progressBarY = size.y * topUIRatio / 2;
+      final progressBarCenter = Offset(size.x / 2, progressBarY);
+      final unlockedColor = SandGame.colors[
+          (currentMilestone - 1).clamp(0, SandGame.colors.length - 1)];
+
+      _confettiEmitter.emit(
+        origin: progressBarCenter,
+        baseColor: unlockedColor,
+        count: 30,
+        spread: 250,
+        upwardVelocity: -300,
+      );
+
+      // Show notification badge between HUD and grid
+      final badgeY = size.y * topUIRatio + 30;
+      _activeBadge = NotificationBadge(
+        milestone: currentMilestone,
+        unlockedColor: unlockedColor,
+        nextMilestoneScore:
+            MilestoneService.instance.getNextMilestoneScore(currentScore),
+        targetPosition: Offset(size.x / 2, badgeY),
+      );
     }
 
     if (sandWorld.isStable && !_wasStableLastFrame) {
@@ -505,6 +536,17 @@ class SandGame extends FlameGame with TapCallbacks {
       }
     }
 
+    // Update confetti particles
+    _confettiEmitter.update(dt);
+
+    // Update notification badge
+    if (_activeBadge != null) {
+      _activeBadge!.update(dt);
+      if (_activeBadge!.isExpired) {
+        _activeBadge = null;
+      }
+    }
+
     _wasStableLastFrame = sandWorld.isStable;
   }
 
@@ -575,6 +617,14 @@ class SandGame extends FlameGame with TapCallbacks {
     }
 
     canvas.restore();
+
+    // Draw confetti (outside shake transform)
+    _confettiEmitter.draw(canvas);
+
+    // Draw notification badge (outside shake transform)
+    if (_activeBadge != null) {
+      _activeBadge!.draw(canvas);
+    }
   }
 
   void _startClearingAnimation(List<int> cellIndices) {
@@ -880,6 +930,8 @@ class SandGame extends FlameGame with TapCallbacks {
     _shakeIntensity = 0;
     _shakeElapsed = 0;
     _shakeOffset = Offset.zero;
+    _confettiEmitter.particles.clear();
+    _activeBadge = null;
   }
 
   /// Loads a saved game state and rebuilds the world from the saved sparse grid.
