@@ -398,11 +398,19 @@ class SandGame extends FlameGame with TapCallbacks {
     if (sandWorld.isGameOver) {
       if (!_isGameOverDetected) {
         _isGameOverDetected = true;
+
         // Save high score if current score is higher
         HighScoreService.instance.saveHighScoreIfHigher(
           ScoringService.instance.currentScore,
         );
+
+        // Delete saved game
+        SaveGameService.instance.deleteSavedGame();
+
+        // Pause the Engine
         pauseEngine();
+
+        // Show game over overlay
         overlays.add(GameConfig.gameOverOverlay);
       }
       return;
