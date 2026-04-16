@@ -6,6 +6,7 @@ import 'package:sandfall/services/high_score_service.dart';
 import 'package:sandfall/services/save_game_service.dart';
 import 'package:sandfall/services/scoring_service.dart';
 import 'package:sandfall/theme/theme.dart';
+import 'package:sandfall/ui/components/menu_button.dart';
 
 class MainMenuOverlay extends StatelessWidget {
   final SandGame game;
@@ -43,7 +44,7 @@ class MainMenuOverlay extends StatelessWidget {
                   const SizedBox(height: 48),
 
                   if (hasSavedGame) ...[
-                    _MenuButton(
+                    MenuButton(
                       label: 'CONTINUE',
                       sublabel: 'Score: $savedScore',
                       onPressed: () {
@@ -57,7 +58,7 @@ class MainMenuOverlay extends StatelessWidget {
                     const SizedBox(height: 12),
                   ],
 
-                  _MenuButton(
+                  MenuButton(
                     label: 'NEW GAME',
                     onPressed: () {
                       SaveGameService.instance.deleteSavedGame();
@@ -332,61 +333,6 @@ class _HighScoreCard extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MenuButton extends StatelessWidget {
-  final String label;
-  final String? sublabel;
-  final VoidCallback onPressed;
-
-  const _MenuButton({
-    required this.label,
-    this.sublabel,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 64,
-      decoration: BoxDecoration(
-        color: SandColors.darkBg.withAlpha(150),
-        borderRadius: BorderRadius.circular(2),
-      ),
-      child: TextButton(
-        style: TextButton.styleFrom(
-          foregroundColor: SandColors.primaryGold.withAlpha(180),
-          side: BorderSide(color: SandColors.deepSand.withAlpha(80), width: 1),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
-        ),
-        onPressed: onPressed,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w400,
-                letterSpacing: 3,
-                fontFamily: 'monospace',
-              ),
-            ),
-            if (sublabel != null)
-              Text(
-                sublabel!,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: SandColors.lightSand.withAlpha(100),
-                  fontFamily: 'monospace',
-                ),
-              ),
-          ],
-        ),
-      ),
     );
   }
 }
