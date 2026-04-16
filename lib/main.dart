@@ -1,3 +1,4 @@
+import 'package:flame/flame.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -14,9 +15,13 @@ import 'package:sandfall/ui/pause_overlay.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Hive.initFlutter();
   await HighScoreService.instance.initialize();
   await SaveGameService.instance.initialize();
+
+  Flame.device.fullScreen();
+
   runApp(const SandCrush());
 }
 
