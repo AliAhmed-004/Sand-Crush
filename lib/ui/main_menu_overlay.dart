@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:math' as Math;
 import 'package:flutter/material.dart';
 import 'package:sandfall/config/game_config.dart';
 import 'package:sandfall/game.dart';
@@ -33,7 +34,7 @@ class MainMenuOverlay extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Spacer(flex: 2),
+                  const Spacer(flex: 3),
 
                   const _GameTitle(),
 
@@ -248,7 +249,7 @@ class _TetrominoPainter extends CustomPainter {
 
       // Apply scatter after landing
       if (scatterProgress > 0) {
-        final double angle = _randomForCell(cell) * 2 * 3.14159;
+        final double angle = _randomForCell(cell) * 2 * Math.pi;
         final double distance = scatterProgress * 30 * _randomForCell2(cell);
         x += cos(angle) * distance;
         y += sin(angle) * distance;

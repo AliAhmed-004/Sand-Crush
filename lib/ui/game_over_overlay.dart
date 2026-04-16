@@ -4,84 +4,145 @@ import 'package:sandfall/game.dart';
 import 'package:sandfall/services/high_score_service.dart';
 import 'package:sandfall/services/scoring_service.dart';
 import 'package:sandfall/theme/theme.dart';
+import 'package:sandfall/ui/components/menu_button.dart';
 
-/// Game Over overlay displayed when sand reaches the top threshold.
 class GameOverOverlay extends StatelessWidget {
   final SandGame game;
+
   const GameOverOverlay({super.key, required this.game});
 
   @override
   Widget build(BuildContext context) {
     final finalScore = ScoringService.instance.currentScore;
+
     final highScore = HighScoreService.instance.getHighScore();
-    final isNewRecord = finalScore > highScore;
+
+    final isNewRecord = finalScore >= highScore;
 
     return Material(
-      color: Colors.black.withAlpha(179), // Semi-transparent dark background
+      color: Colors.black.withAlpha(160),
       child: Center(
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 100),
-          margin: const EdgeInsets.symmetric(horizontal: 20),
+          width: 320,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
           decoration: BoxDecoration(
-            color: SandColors.mediumBg,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: SandColors.deepSand, width: 3),
+            color: SandColors.darkBg.withAlpha(240),
+            border: Border.all(color: SandColors.deepSand, width: 2),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
                 'GAME OVER',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: SandColors.warmAccent,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: SandColors.primaryGold,
+                  letterSpacing: 3,
+                  fontFamily: 'monospace',
                 ),
               ),
-              const SizedBox(height: 20),
-              if (isNewRecord)
-                const Text(
-                  '🎉 NEW RECORD! 🎉',
+
+              const SizedBox(height: 24),
+
+              if (isNewRecord) ...[
+                Text(
+                  'NEW RECORD',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: SandColors.primaryGold,
+                    color: SandColors.warmAccent,
+                    letterSpacing: 2,
+                    fontFamily: 'monospace',
                   ),
                 ),
-              const SizedBox(height: 20),
-              Text(
-                'Final Score: $finalScore',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: SandColors.lightSand,
-                ),
-              ),
-              const SizedBox(height: 15),
-              Text(
-                'High Score: $highScore',
-                style: const TextStyle(
-                  fontSize: 18,
-                  color: SandColors.sandyBeige,
-                ),
-              ),
-              const SizedBox(height: 40),
-              ElevatedButton(
+                const SizedBox(height: 18),
+              ],
+
+              _ScoreRow(label: 'SCORE', value: finalScore),
+
+              const SizedBox(height: 10),
+
+              _ScoreRow(label: 'BEST', value: highScore),
+
+              const SizedBox(height: 24),
+
+              Divider(color: SandColors.deepSand.withAlpha(100), height: 1),
+
+              const SizedBox(height: 18),
+
+              MenuButton(
+                label: 'RETURN TO MENU',
                 onPressed: () {
                   game.overlays.remove(GameConfig.gameOverOverlay);
+
                   game.overlays.add(GameConfig.mainMenuOverlay);
                 },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    'Return to Menu',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
+              ),
+
+              SizedBox(height: 12),
+
+              MenuButton(
+                label: "TRY AGAIN",
+                onPressed: () {
+                  game.resetGameState();
+                  ScoringService.instance.resetScore();
+
+                  game.overlays.remove(GameConfig.gameOverOverlay);
+
+                  game.isGameStarted = true;
+                  game.resumeEngine();
+
+                  game.overlays.add(GameConfig.hudOverlay);
+                },
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ScoreRow extends StatelessWidget {
+  final String label;
+  final int value;
+
+  const _ScoreRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      decoration: BoxDecoration(
+        border: Border.all(color: SandColors.deepSand, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: SandColors.lightSand.withAlpha(180),
+                letterSpacing: 1.5,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+          Text(
+            value.toString(),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: SandColors.primaryGold,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
       ),
     );
   }
